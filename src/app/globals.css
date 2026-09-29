@@ -1,26 +1,50 @@
 @import "tailwindcss";
 
+/* Paleta corporativa Go Compras */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #1d357d;
+  --primary-dark: #14255a;
+  --accent: #ff5500;
+  --accent-hover: #e04b00;
+  --secondary: #ffc72c;
+  --surface: #f8fafc;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-secondary: var(--secondary);
+  --color-surface: var(--surface);
+  --color-main: var(--text-main);
+  --color-muted: var(--text-muted);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-background: var(--surface);
+  --color-foreground: var(--text-main);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer components {
+  .product-card {
+    @apply rounded-xl border border-slate-100 bg-white shadow-sm transition-shadow hover:shadow-md;
+  }
+
+  .catalog-grid {
+    @apply grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4;
   }
 }
 
+@utility btn-touch {
+  @apply min-h-11 rounded-lg;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface);
+  color: var(--text-main);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }

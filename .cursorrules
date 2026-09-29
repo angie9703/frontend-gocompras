@@ -1,0 +1,65 @@
+# GO COMPRAS - FRONTEND ARCHITECTURE & RULES (NEXT.JS + TAILWIND + ZUSTAND)
+
+## 1. Visión y Tecnologías
+- Proyecto: Frontend Web E-Commerce y Panel Administrativo para "Go Compras" (Materiales Eléctricos).
+- Stack: Next.js (App Router, React 19), TypeScript, Tailwind CSS, Zustand (Estado global / Carrito), Lucide React (Íconos), Axios / Fetch.
+- Backend de Referencia: API REST Node.js/Express (`http://localhost:4000/api/v1` en desarrollo).
+
+## 2. Principios de Arquitectura y Estructura de Directorios
+Sigue la convención del `src/` directory con App Router:
+
+├── app/                  # Rutas y páginas de Next.js (App Router)
+│   ├── (tienda)/        # Route Group para la tienda pública (Layout con Header, Footer, Carrito)
+│   │   ├── page.tsx     # Landing / Catálogo principal
+│   │   ├── productos/   # Listado y detalle de producto (/productos/[id])
+│   │   └── checkout/    # Resumen de compra y derivación a WhatsApp / PDF
+│   ├── admin/           # Panel privado (Login, Gestión de Pedidos/Productos)
+│   └── api/             # Route Handlers de Next.js si fueren necesarios
+├── components/           # Componentes React reutilizables
+│   ├── ui/              # Botones, Modales, Inputs, Tarjetas (Estilo Tailwind)
+│   ├── catalog/         # Buscador, Filtros por Categoría/Marca, Grid de Productos
+│   ├── cart/            # Drawer / Slide-over del Carrito, Resumen de Totales
+│   └── admin/           # Tablas de pedidos, formularios de productos/promos
+├── store/               # Estados globales con Zustand
+│   ├── useCartStore.ts  # Persistencia del carrito, cálculo de ítems y subtotal
+│   └── useAuthStore.ts  # Token JWT y rol del usuario admin/vendedor
+├── services/            # Cliente API e integración con el Backend Express
+│   ├── api.ts           # Instancia Axios/Fetch configurada con NEXT_PUBLIC_API_URL
+│   ├── productos.ts     # Consultas de catálogo, variantes y stock
+│   ├── envios.ts        # Cotización por CP y consulta de puntos seguros
+│   └── pedidos.ts       # Creación de pedidos y descarga de PDF
+├── types/               # Definiciones e interfaces de TypeScript (coincidentes con la API)
+└── utils/               # Formateadores de moneda (ARS), constantes y helpers
+
+## 3. Reglas de Componentes y UI/UX
+- Mobile First: El público principal ingresa desde dispositivos móviles vía redes sociales. Toda la interfaz debe ser altamente adaptativa (responsive) e intuitiva.
+- Server vs. Client Components:
+  * Utiliza Server Components por defecto para páginas de catálogo, layouts estáticos y SEO optimizado.
+  * Utiliza Client Components (`'use client'`) solo cuando se requiera interactividad (Estado de Zustand, hooks como `useState`, formularios, modales).
+- Estilos con Tailwind CSS: Usa clases de Tailwind estructuradas y limpias. No hardcodear colores HEX recurrentes; aprovecha la paleta definida en el sistema.
+
+## 4. Estado Global y Carrito (Zustand)
+- El estado del carrito debe persistirse en `localStorage` usando el middleware `persist` de Zustand.
+- Métodos clave del `useCartStore`:
+  * `addItem(variante, cantidad)`
+  * `removeItem(varianteId)`
+  * `updateQuantity(varianteId, cantidad)`
+  * `clearCart()`
+  * `getSubtotal()`
+- Regla del Servidor: Recordar que los descuentos por promociones y el cálculo final se validan y procesan en el Servidor (API Express) al momento del checkout, para evitar alteraciones en el cliente.
+
+## 5. Integración con la API Backend (Express)
+- Utiliza la variable de entorno `NEXT_PUBLIC_API_URL` (ej: `http://localhost:4000/api/v1`).
+- Respuestas de API esperadas:
+  * Éxito: `{ success: true, data: ..., meta: ... }`
+  * Error: `{ success: false, error: { code, message } }`
+- Manejo de PDF de Presupuesto:
+  * Proporcionar botón para abrir la URL del PDF del pedido (`data.pdfUrl`) o disparar la descarga directa usando Blob/Streaming desde la API `/pedidos/:codigo/pdf`.
+- Finalización de Pedido (Checkout):
+  * Al enviar el checkout `POST /api/v1/pedidos`, el frontend recibe la confirmación con el código de pedido (`GC-YYYY-XXXX`).
+  * Generar el botón de enlace directo a WhatsApp con el mensaje pre-armado que incluya el código del pedido y el punto de entrega seleccionado.
+
+## 6. Convenciones de Código y TypeScript
+- Tipado Estricto: Interfaces claras para `Producto`, `Variante`, `Pedido`, `ZonaEnvio`, `TipoEntrega` (`RETIRO_LOCAL`, `PUNTO_SEGURO_ESTACION`, `PUNTO_SEGURO_SUPERMERCADO`, `DOMICILIO_A_CONVENIR`).
+- Formateo de Moneda: Helper `formatCurrency(monto)` que retorne en pesos argentinos (`$ X.XXX`).
+- Manejo de Errores: Capturar errores de red o validación Zod provenientes de la API y mostrarlos mediante notificaciones claras o alertas en pantalla.
