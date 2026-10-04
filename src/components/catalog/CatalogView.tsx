@@ -26,6 +26,7 @@ import {
   clearCatalogFiltersPath,
   countActiveCatalogFilters,
   hasActiveCatalogFilters,
+  parseMarcaIds,
   readCatalogQuery,
 } from "@/lib/catalogQuery";
 import { cn } from "@/lib/cn";
@@ -174,12 +175,14 @@ export function CatalogView() {
     setError(null);
     setPage(1);
 
+    const marcaIds = parseMarcaIds(query.marcaId);
+
     getProductos({
       busqueda: query.q || undefined,
       categoria: query.categoria || undefined,
       categoriaId: query.categoriaId || undefined,
       subcategoria: query.subcategoria || undefined,
-      marcaId: query.marcaId || undefined,
+      marcaId: marcaIds.length === 1 ? marcaIds[0] : undefined,
       orden: query.orden,
       enStock: query.enStock || undefined,
       ofertas: query.ofertas || undefined,
@@ -188,12 +191,12 @@ export function CatalogView() {
       .then((response) => {
         if (cancelled) return;
         const items = query.q.trim()
-          ? response.data
+          ? response.data.filter((producto) => productoCoincideMarca(producto, query.marcaId))
           : applyClientFilters(response.data, query);
         setProductos(items);
         const metaTotal = response.meta?.total;
         const apiTotal = typeof metaTotal === "number" ? metaTotal : response.data.length;
-        setTotal(query.q.trim() || items.length === response.data.length ? apiTotal : items.length);
+        setTotal(query.q.trim() && items.length === response.data.length ? apiTotal : items.length);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -225,11 +228,13 @@ export function CatalogView() {
   useEffect(() => {
     if (marcasLoading) return;
     if (!query.categoria && !query.categoriaId) return;
-    if (!query.marcaId) return;
+    const marcaIds = parseMarcaIds(query.marcaId);
+    if (marcaIds.length === 0) return;
     const hayMarcasReales = marcas.some((marca) => marca.id > 0);
     if (!hayMarcasReales) return;
-    if (marcas.some((marca) => String(marca.id) === query.marcaId)) return;
-    router.replace(buildCatalogPath(searchParams, { marcaId: "" }), { scroll: false });
+    const validas = marcaIds.filter((id) => marcas.some((marca) => String(marca.id) === id));
+    if (validas.length === marcaIds.length) return;
+    router.replace(buildCatalogPath(searchParams, { marcaId: validas.join(",") }), { scroll: false });
   }, [
     marcas,
     marcasLoading,
@@ -265,10 +270,10 @@ export function CatalogView() {
       ),
     [categorias, query.categoria, query.categoriaId],
   );
-  const marcaActiva = useMemo(
-    () => marcas.find((marca) => String(marca.id) === query.marcaId),
-    [marcas, query.marcaId],
-  );
+  const marcasActivas = useMemo(() => {
+    const ids = new Set(parseMarcaIds(query.marcaId));
+    return marcas.filter((marca) => ids.has(String(marca.id)));
+  }, [marcas, query.marcaId]);
 
   const pushQuery = (next: CatalogQueryState) => {
     router.push(catalogStateToPath(next), { scroll: false });
@@ -310,11 +315,16 @@ export function CatalogView() {
       onRemove: () => patchUrl({ subcategoria: "" }),
     });
   }
-  if (marcaActiva) {
+  for (const marca of marcasActivas) {
     activeChips.push({
-      key: "marca",
-      label: `Marca: ${marcaActiva.nombre}`,
-      onRemove: () => patchUrl({ marcaId: "" }),
+      key: `marca-${marca.id}`,
+      label: `Marca: ${marca.nombre}`,
+      onRemove: () =>
+        patchUrl({
+          marcaId: parseMarcaIds(query.marcaId)
+            .filter((id) => id !== String(marca.id))
+            .join(","),
+        }),
     });
   }
   if (query.precioMin || query.precioMax) {
@@ -467,7 +477,7 @@ export function CatalogView() {
               <ProductGrid
                 productos={pagedProductos}
                 loading={loading}
-                className="lg:grid-cols-3"
+                className="lg:grid-cols-3 xl:grid-cols-4"
               />
 
               {!loading && totalPages > 1 ? (

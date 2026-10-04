@@ -1,16 +1,17 @@
 "use client";
 
-import { ImageOff, ShoppingBag } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { type ChangeEvent, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PriceDisplay } from "@/components/product/PriceDisplay";
 import {
+  especificacionTarjeta,
   getActiveVariantes,
   getDefaultVariante,
-  getEspecificacionClave,
   getProductoImagen,
+  tituloTarjetaProducto,
   toCartItem,
 } from "@/lib/catalog";
 import { getDescuentoPorcentaje, tienePrecioOferta } from "@/lib/pricing";
@@ -31,8 +32,10 @@ export function ProductCard({ producto }: ProductCardProps) {
 
   const enStock = (selectedVariant?.stockDisponible ?? 0) > 0;
   const imagenUrl = selectedVariant?.imagenUrl || getProductoImagen(producto, selectedVariant);
-  const titulo = selectedVariant?.nombre?.trim() || producto.nombre;
-  const especificacion = getEspecificacionClave(titulo, selectedVariant?.atributos);
+  const [imagenRota, setImagenRota] = useState<string | null>(null);
+  const mostrarPlaceholder = !imagenUrl || imagenRota === imagenUrl;
+  const titulo = tituloTarjetaProducto(producto, selectedVariant);
+  const especificacion = especificacionTarjeta(selectedVariant, titulo);
 
   const onSelectVariante = (event: ChangeEvent<HTMLSelectElement>) => {
     const varianteEncontrada = producto.variantes.find(
@@ -54,16 +57,17 @@ export function ProductCard({ producto }: ProductCardProps) {
       <div className="flex flex-1 flex-col">
         <Link href={`/productos/${producto.id}`} className="group block">
           <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-lg bg-white sm:h-52 md:h-60">
-            {imagenUrl ? (
+            {mostrarPlaceholder ? (
+              <div className="flex size-full items-center justify-center bg-slate-50">
+                <img src="/logo.ico" alt="" className="size-14 object-contain opacity-50" />
+              </div>
+            ) : (
               <img
                 src={imagenUrl}
                 alt={titulo}
                 className="h-full w-full object-contain object-center p-2"
+                onError={() => setImagenRota(imagenUrl)}
               />
-            ) : (
-              <div className="flex size-full items-center justify-center text-muted">
-                <ImageOff className="size-8" aria-hidden />
-              </div>
             )}
             {selectedVariant && tienePrecioOferta(selectedVariant) ? (
               <Badge kind="descuento" className="absolute top-2 left-2 shadow-sm">
@@ -79,15 +83,19 @@ export function ProductCard({ producto }: ProductCardProps) {
           ) : null}
         </Link>
 
-        <p className="mt-1 text-xs text-muted">SKU {selectedVariant?.sku ?? "—"}</p>
+        <p className="mt-1 text-[11px] leading-4 text-gray-400">SKU {selectedVariant?.sku ?? "—"}</p>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge kind={enStock ? "stock" : "consultar"} />
+        <div className="mt-2 flex items-center justify-between gap-2">
           {selectedVariant ? (
-            <PriceDisplay source={selectedVariant} size="sm" />
+            <PriceDisplay
+              source={selectedVariant}
+              size="sm"
+              className="min-w-0 [&_p.text-accent]:font-bold [&_p.text-primary]:font-bold"
+            />
           ) : (
-            <p className="text-sm font-semibold text-primary">Consultar</p>
+            <p className="text-sm font-bold text-primary">Consultar</p>
           )}
+          <Badge kind={enStock ? "stock" : "consultar"} className="shrink-0" />
         </div>
 
         {variantes.length > 1 ? (

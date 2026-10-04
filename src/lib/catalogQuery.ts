@@ -66,6 +66,17 @@ function parsePriceParam(value: string | null): string {
   return String(amount);
 }
 
+export function parseMarcaIds(value: string | number | null | undefined): string[] {
+  if (value == null) return [];
+  const ids: string[] = [];
+  for (const part of String(value).split(",")) {
+    const id = part.trim();
+    if (!/^\d+$/.test(id) || Number(id) <= 0 || ids.includes(id)) continue;
+    ids.push(id);
+  }
+  return ids;
+}
+
 export function readCatalogQuery(searchParams: URLSearchParams): CatalogQueryState {
   const ordenRaw = searchParams.get("orden")?.trim() ?? "";
   return {
@@ -78,7 +89,7 @@ export function readCatalogQuery(searchParams: URLSearchParams): CatalogQuerySta
     ofertas: parseEnStockParam(searchParams.get("ofertas")),
     precioMin: parsePriceParam(searchParams.get("precioMin")),
     precioMax: parsePriceParam(searchParams.get("precioMax")),
-    marcaId: searchParams.get("marcaId")?.trim() ?? "",
+    marcaId: parseMarcaIds(searchParams.get("marcaId")).join(","),
   };
 }
 
@@ -96,7 +107,7 @@ export function countActiveCatalogFilters(query: CatalogQueryState): number {
   if (query.orden && query.orden !== DEFAULT_CATALOG_ORDEN) count += 1;
   if (query.precioMin) count += 1;
   if (query.precioMax) count += 1;
-  if (query.marcaId) count += 1;
+  count += parseMarcaIds(query.marcaId).length;
   return count;
 }
 
@@ -154,8 +165,8 @@ function applyPatch(params: URLSearchParams, patch: CatalogQueryPatch): void {
   }
 
   if ("marcaId" in patch) {
-    const value = patch.marcaId == null ? "" : String(patch.marcaId).trim();
-    if (value && Number(value) > 0) params.set("marcaId", value);
+    const value = parseMarcaIds(patch.marcaId).join(",");
+    if (value) params.set("marcaId", value);
     else params.delete("marcaId");
   }
 }

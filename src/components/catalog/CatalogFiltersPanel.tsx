@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
-import { CATALOG_ORDEN_OPTIONS, type CatalogQueryState } from "@/lib/catalogQuery";
+import { CATALOG_ORDEN_OPTIONS, parseMarcaIds, type CatalogQueryState } from "@/lib/catalogQuery";
 import { cn } from "@/lib/cn";
 import type { Categoria, Marca } from "@/types";
 
@@ -28,6 +28,17 @@ export function CatalogFiltersPanel({
   const todosActive = !query.categoria && !query.categoriaId && !query.subcategoria;
   const marcaGroupName = useId();
   const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
+  const [marcasExpandidas, setMarcasExpandidas] = useState(false);
+  const marcasSeleccionadas = parseMarcaIds(query.marcaId);
+  const marcasVisibles = (() => {
+    if (marcasExpandidas || marcas.length <= 6) return marcas;
+    const iniciales = marcas.slice(0, 6);
+    const visibles = new Set(iniciales.map((marca) => marca.id));
+    const seleccionadasOcultas = marcas.filter(
+      (marca) => marcasSeleccionadas.includes(String(marca.id)) && !visibles.has(marca.id),
+    );
+    return [...iniciales, ...seleccionadasOcultas];
+  })();
 
   return (
     <div className="relative z-10 grid gap-6 pointer-events-auto">
@@ -152,39 +163,61 @@ export function CatalogFiltersPanel({
               <label
                 className={cn(
                   "flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium text-main transition-colors",
-                  !query.marcaId ? "bg-primary/10 text-primary" : "hover:bg-primary/5",
+                  marcasSeleccionadas.length === 0 ? "bg-primary/10 text-primary" : "hover:bg-primary/5",
                 )}
               >
                 <input
-                  type="radio"
-                  name={marcaGroupName}
+                  type="checkbox"
                   className="size-4 accent-primary"
-                  checked={!query.marcaId}
+                  checked={marcasSeleccionadas.length === 0}
                   onChange={() => onChange({ marcaId: "" })}
                 />
                 Todas las marcas
               </label>
-              {marcas.map((marca) => {
-                const active = query.marcaId === String(marca.id);
-                return (
-                  <label
-                    key={marca.id}
-                    className={cn(
-                      "flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium text-main transition-colors",
-                      active ? "bg-primary/10 text-primary" : "hover:bg-primary/5",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name={marcaGroupName}
-                      className="size-4 accent-primary"
-                      checked={active}
-                      onChange={() => onChange({ marcaId: marca.id > 0 ? String(marca.id) : "" })}
-                    />
-                    {marca.nombre}
-                  </label>
-                );
-              })}
+              <div
+                className={cn(
+                  "grid gap-1.5",
+                  marcasExpandidas && marcas.length > 6 && "max-h-64 overflow-y-auto pr-1",
+                )}
+              >
+                {marcasVisibles.map((marca) => {
+                  const value = String(marca.id);
+                  const active = marca.id > 0 && marcasSeleccionadas.includes(value);
+                  return (
+                    <label
+                      key={marca.id}
+                      className={cn(
+                        "flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium text-main transition-colors",
+                        active ? "bg-primary/10 text-primary" : "hover:bg-primary/5",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={active}
+                        onChange={() => {
+                          if (marca.id <= 0) return;
+                          const next = active
+                            ? marcasSeleccionadas.filter((id) => id !== value)
+                            : [...marcasSeleccionadas, value];
+                          onChange({ marcaId: next.join(",") });
+                        }}
+                      />
+                      {marca.nombre}
+                    </label>
+                  );
+                })}
+              </div>
+              {marcas.length > 6 ? (
+                <button
+                  type="button"
+                  className="min-h-9 px-2 text-left text-sm font-semibold text-primary hover:underline"
+                  aria-expanded={marcasExpandidas}
+                  onClick={() => setMarcasExpandidas((current) => !current)}
+                >
+                  {marcasExpandidas ? "Mostrar menos" : `Mostrar más (${marcas.length - 6})`}
+                </button>
+              ) : null}
             </>
           )}
         </div>

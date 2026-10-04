@@ -11,6 +11,7 @@ import {
   getActiveVariantes,
   getDefaultVariante,
   getGaleriaItems,
+  tituloTarjetaProducto,
   toCartItem,
 } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
@@ -39,12 +40,7 @@ export function ProductDetail({ producto }: ProductDetailProps) {
 
   const selectedVariante: Variante | undefined =
     variantes.find((variante) => variante.sku === selectedSku) ?? variantes[0];
-  const varianteActiva = selectedVariante as (Variante & { nombre_producto?: string | null }) | undefined;
-  const titulo =
-    varianteActiva?.nombre_producto?.trim() ||
-    varianteActiva?.atributos?.nombre_producto?.trim() ||
-    varianteActiva?.nombre?.trim() ||
-    producto.nombre;
+  const titulo = tituloTarjetaProducto(producto, selectedVariante);
   const imagenActual = galeria[Math.min(imageIndex, Math.max(galeria.length - 1, 0))]?.url ?? null;
   const enStock = (selectedVariante?.stockDisponible ?? 0) > 0;
   const maxCantidad = selectedVariante?.stockDisponible ?? 0;
