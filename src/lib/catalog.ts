@@ -1,4 +1,4 @@
-import type { CartItem, Producto, Variante } from "@/types";
+import type { CartItem, Marca, Producto, Variante } from "@/types";
 import { getDescuentoPorcentaje, getPrecioLista, getPrecioOferta } from "@/lib/pricing";
 
 export function getActiveVariantes(producto: Producto): Variante[] {
@@ -57,6 +57,20 @@ export function productoCoincideSubcategoria(producto: Producto, subcategoria?: 
   return (producto.subcategoria ?? "").trim().toLowerCase() === wanted;
 }
 
+export function marcasDesdeProductos(productos: Producto[]): Marca[] {
+  const byId = new Map<number, Marca>();
+
+  for (const producto of productos) {
+    const marca = producto.marca;
+    if (!marca?.nombre?.trim() || byId.has(marca.id)) continue;
+    byId.set(marca.id, { id: marca.id, nombre: marca.nombre, activo: true });
+  }
+
+  return [...byId.values()].sort((a, b) =>
+    a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }),
+  );
+}
+
 export function productoCoincideMarca(producto: Producto, marcaId?: string): boolean {
   const id = marcaId?.trim();
   if (!id) return true;
@@ -91,10 +105,82 @@ export function getVarianteNombre(variante: Variante | undefined, fallback: stri
   return variante?.nombre?.trim() || fallback;
 }
 
-export function formatVarianteLabel(variante: Variante): string {
-  if (variante.atributos && Object.keys(variante.atributos).length > 0) {
-    return Object.values(variante.atributos).join(" · ");
+const ATRIBUTO_IGNORADO = /^(nombre_producto|variante_nombre|nombre|color|sku)$/i;
+const ATRIBUTO_ESPECIFICACION =
+  /(medida|calibre|potencia|secci[oó]n|di[aá]metro|largo|tensi[oó]n|amper|watt)/i;
+
+const PATRONES_MEDIDA: RegExp[] = [
+  /\d+\s*x\s*\d+(?:[.,]\d+)?\s*mm\b/gi,
+  /\d+\s*x\s*\d+(?:[.,]\d+)?\s*A\b/gi,
+  /\d+(?:[.,]\d+)?\s*mm\b/gi,
+  /\d+(?:[.,]\d+)?\s*W\b/gi,
+  /\d+(?:[.,]\d+)?\s*A\b/gi,
+  /x\s*\d+(?:[.,]\d+)?\s*m\b/gi,
+  /\d+\s*x\s*\d+\b/gi,
+];
+
+function formatearMedida(token: string): string {
+  const compact = token.replace(/\s+/g, "");
+  const metro = compact.match(/^x?(\d+(?:[.,]\d+)?)m$/i);
+  if (metro && !/mm$/i.test(compact)) return `${metro[1]} m`;
+  const seccion = compact.match(/^(\d+x\d+(?:[.,]\d+)?)mm$/i);
+  if (seccion) return `${seccion[1]} mm`;
+  const milimetro = compact.match(/^(\d+(?:[.,]\d+)?)mm$/i);
+  if (milimetro) return `${milimetro[1]} mm`;
+  const amperaje = compact.match(/^(\d+x\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)A$/i);
+  if (amperaje) return `${amperaje[1]} A`;
+  const potencia = compact.match(/^(\d+(?:[.,]\d+)?)W$/i);
+  if (potencia) return `${potencia[1]} W`;
+  return compact;
+}
+
+function medidasDesdeNombre(nombre: string): string[] {
+  const hallazgos: Array<{ start: number; end: number; text: string }> = [];
+
+  for (const patron of PATRONES_MEDIDA) {
+    patron.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = patron.exec(nombre))) {
+      const start = match.index;
+      const end = start + match[0].length;
+      const seSolapa = hallazgos.some((item) => start < item.end && end > item.start);
+      if (!seSolapa) hallazgos.push({ start, end, text: formatearMedida(match[0]) });
+    }
   }
+
+  return [...new Set(hallazgos.sort((a, b) => a.start - b.start).map((item) => item.text))].slice(0, 3);
+}
+
+export function getEspecificacionClave(
+  nombre: string,
+  atributos?: Record<string, string> | null,
+): string | null {
+  const desdeAtributos = [
+    ...new Set(
+      Object.entries(atributos ?? {})
+        .filter(([clave, valor]) => {
+          const texto = valor?.trim();
+          if (!texto || ATRIBUTO_IGNORADO.test(clave)) return false;
+          return ATRIBUTO_ESPECIFICACION.test(clave);
+        })
+        .map(([, valor]) => valor.trim()),
+    ),
+  ];
+
+  const medidas = desdeAtributos.length > 0 ? desdeAtributos.slice(0, 3) : medidasDesdeNombre(nombre);
+  return medidas.length > 0 ? medidas.join(" · ") : null;
+}
+
+export function formatVarianteLabel(variante: Variante): string {
+  const corta = variante.variante_nombre?.trim();
+  if (corta) return corta;
+
+  const valores = Object.entries(variante.atributos ?? {})
+    .filter(([clave]) => !/^(nombre_producto|nombre)$/i.test(clave))
+    .map(([, valor]) => valor?.trim())
+    .filter((valor): valor is string => Boolean(valor));
+
+  if (valores.length > 0) return [...new Set(valores)].join(" · ");
   return variante.sku;
 }
 
@@ -103,10 +189,41 @@ export function getProductoImagen(producto: Producto, variante?: Variante): stri
 }
 
 export function getProductoGaleria(producto: Producto, variante?: Variante): string[] {
-  const urls = [variante?.imagenUrl, producto.imagenUrl, ...producto.imagenes].filter(
+  const urls = [variante?.imagenUrl, producto.imagenUrl, ...(producto.imagenes ?? [])].filter(
     (url): url is string => Boolean(url),
   );
   return [...new Set(urls)];
+}
+
+export interface GaleriaItem {
+  url: string;
+  varianteSku?: string;
+}
+
+export function getGaleriaItems(producto: Producto, variantes: Variante[]): GaleriaItem[] {
+  const skuPorUrl = new Map<string, string>();
+  for (const variante of variantes) {
+    const url = variante.imagenUrl?.trim();
+    if (url && !skuPorUrl.has(url)) skuPorUrl.set(url, variante.sku);
+  }
+
+  const urls = [
+    producto.imagenUrl,
+    ...(producto.imagenes ?? []),
+    ...variantes.map((variante) => variante.imagenUrl),
+  ];
+  const items: GaleriaItem[] = [];
+  const vistas = new Set<string>();
+
+  for (const raw of urls) {
+    const url = raw?.trim();
+    if (!url || vistas.has(url)) continue;
+    vistas.add(url);
+    const varianteSku = skuPorUrl.get(url);
+    items.push(varianteSku ? { url, varianteSku } : { url });
+  }
+
+  return items;
 }
 
 export function toCartItem(

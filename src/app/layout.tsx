@@ -27,6 +27,11 @@ export const metadata: Metadata = {
     template: "%s | GO COMPRAS",
   },
   description: "Materiales eléctricos y ferretería. Envío a coordinar o retiro en punto seguro.",
+  icons: {
+    icon: "/logo.ico",
+    shortcut: "/logo.ico",
+    apple: "/logo.ico",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -45,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <CartDrawer />
             </StorefrontOnly>
             <LoginDrawer />
-            <main className="flex flex-1 flex-col">{children}</main>
+            <main className="flex w-full min-w-0 max-w-full flex-1 flex-col overflow-x-hidden">{children}</main>
             <StorefrontOnly>
               <Footer />
               <WhatsAppButton />

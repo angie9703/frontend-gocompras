@@ -11,11 +11,14 @@ interface ProductGridProps {
 
 function ProductCardSkeleton() {
   return (
-    <div className="product-card animate-pulse p-4">
-      <div className="aspect-square rounded-lg bg-slate-200" />
-      <div className="mt-3 h-4 w-3/4 rounded bg-slate-200" />
-      <div className="mt-2 h-3 w-1/2 rounded bg-slate-200" />
-      <div className="mt-3 h-4 w-1/3 rounded bg-slate-200" />
+    <div className="product-card flex h-full animate-pulse flex-col justify-between p-3 sm:p-4">
+      <div>
+        <div className="h-40 rounded-lg bg-slate-200 sm:h-52 md:h-60" />
+        <div className="mt-3 h-12 w-full rounded bg-slate-200" />
+        <div className="mt-2 h-4 w-2/3 rounded bg-slate-200" />
+        <div className="mt-2 h-3 w-1/2 rounded bg-slate-200" />
+        <div className="mt-3 h-4 w-1/3 rounded bg-slate-200" />
+      </div>
       <div className="mt-4 h-11 rounded-lg bg-slate-200" />
     </div>
   );

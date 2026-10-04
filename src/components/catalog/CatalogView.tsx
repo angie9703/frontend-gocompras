@@ -10,6 +10,7 @@ import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { Button } from "@/components/ui/Button";
 import {
   getActiveVariantes,
+  marcasDesdeProductos,
   productoCoincideCategoria,
   productoCoincideMarca,
   productoCoincideSubcategoria,
@@ -59,6 +60,60 @@ function applyClientFilters(productos: Producto[], query: CatalogQueryState): Pr
 
 const PAGE_SIZE = 12;
 
+function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = true) {
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [loading, setLoading] = useState(enabled);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let cancelled = false;
+    setLoading(true);
+    const tieneCategoria = Boolean(categoria.trim() || categoriaId.trim());
+
+    const marcasRequest = getMarcas(
+      tieneCategoria
+        ? {
+            categoria: categoria || undefined,
+            categoriaId: categoriaId || undefined,
+          }
+        : undefined,
+    );
+
+    const productosRequest = tieneCategoria
+      ? getProductos({
+          categoria: categoria || undefined,
+          categoriaId: categoriaId || undefined,
+          pageSize: 100,
+        }).catch(() => null)
+      : Promise.resolve(null);
+
+    void Promise.all([marcasRequest, productosRequest])
+      .then(([apiMarcas, productosResp]) => {
+        if (cancelled) return;
+        if (!tieneCategoria || !productosResp) {
+          setMarcas(apiMarcas);
+          return;
+        }
+
+        const enCategoria = productosResp.data.filter((producto) =>
+          productoCoincideCategoria(producto, categoria, categoriaId),
+        );
+        const derivadas = marcasDesdeProductos(enCategoria);
+        setMarcas(derivadas.length > 0 ? derivadas : apiMarcas);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categoria, categoriaId, enabled]);
+
+  return { marcas, loading };
+}
+
 export function CatalogFallback() {
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8">
@@ -80,8 +135,6 @@ export function CatalogView() {
   const [total, setTotal] = useState(0);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriasLoading, setCategoriasLoading] = useState(true);
-  const [marcas, setMarcas] = useState<Marca[]>([]);
-  const [marcasLoading, setMarcasLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -103,19 +156,17 @@ export function CatalogView() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void getMarcas()
-      .then((items) => {
-        if (!cancelled) setMarcas(items);
-      })
-      .finally(() => {
-        if (!cancelled) setMarcasLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const marcasCatalogo = useMarcasCatalogo(query.categoria, query.categoriaId);
+  const marcas = marcasCatalogo.marcas;
+  const marcasLoading = marcasCatalogo.loading;
+  const categoriaDraftDistinta =
+    drawerOpen &&
+    (draft.categoria !== query.categoria || draft.categoriaId !== query.categoriaId);
+  const marcasDrawer = useMarcasCatalogo(
+    categoriaDraftDistinta ? draft.categoria : query.categoria,
+    categoriaDraftDistinta ? draft.categoriaId : query.categoriaId,
+    categoriaDraftDistinta,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -169,6 +220,24 @@ export function CatalogView() {
     query.precioMin,
     query.precioMax,
     reloadToken,
+  ]);
+
+  useEffect(() => {
+    if (marcasLoading) return;
+    if (!query.categoria && !query.categoriaId) return;
+    if (!query.marcaId) return;
+    const hayMarcasReales = marcas.some((marca) => marca.id > 0);
+    if (!hayMarcasReales) return;
+    if (marcas.some((marca) => String(marca.id) === query.marcaId)) return;
+    router.replace(buildCatalogPath(searchParams, { marcaId: "" }), { scroll: false });
+  }, [
+    marcas,
+    marcasLoading,
+    query.categoria,
+    query.categoriaId,
+    query.marcaId,
+    router,
+    searchParams,
   ]);
 
   useEffect(() => {
@@ -500,8 +569,8 @@ export function CatalogView() {
               query={draft}
               categorias={categorias}
               categoriasLoading={categoriasLoading}
-              marcas={marcas}
-              marcasLoading={marcasLoading}
+              marcas={categoriaDraftDistinta ? marcasDrawer.marcas : marcas}
+              marcasLoading={categoriaDraftDistinta ? marcasDrawer.loading : marcasLoading}
               showOrden
               onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
             />

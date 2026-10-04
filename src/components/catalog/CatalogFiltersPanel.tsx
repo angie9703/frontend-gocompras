@@ -79,13 +79,17 @@ export function CatalogFiltersPanel({
                     <div className="flex items-stretch gap-1">
                       <FilterOption
                         active={categoryActive}
-                        onClick={() =>
+                        onClick={() => {
+                          const mismaCategoria =
+                            query.categoria === categoria.slug ||
+                            (categoria.id > 0 && query.categoriaId === String(categoria.id));
                           onChange({
                             categoria: categoria.slug,
                             categoriaId: categoria.id > 0 ? String(categoria.id) : "",
                             subcategoria: "",
-                          })
-                        }
+                            ...(mismaCategoria ? {} : { marcaId: "" }),
+                          });
+                        }}
                       >
                         {categoria.nombre}
                       </FilterOption>

@@ -26,12 +26,41 @@ function normalizeMarcas(items: Marca[]): Marca[] {
   return items.filter((marca) => marca.activo !== false && Boolean(marca.nombre?.trim()));
 }
 
-export async function getMarcas(): Promise<Marca[]> {
+export interface GetMarcasParams {
+  categoria?: string;
+  categoriaId?: string | number;
+}
+
+function toMarcasQuery(params?: GetMarcasParams): Record<string, string> {
+  const query: Record<string, string> = {};
+  if (!params) return query;
+
+  if (params.categoriaId != null && String(params.categoriaId).trim()) {
+    const categoriaId = String(params.categoriaId).trim();
+    if (/^\d+$/.test(categoriaId) && Number(categoriaId) > 0) {
+      query.categoriaId = categoriaId;
+    }
+  }
+
+  if (params.categoria?.trim()) {
+    query.categoria = params.categoria.trim();
+  }
+
+  return query;
+}
+
+export async function getMarcas(params?: GetMarcasParams): Promise<Marca[]> {
+  const query = toMarcasQuery(params);
+  const filtradasPorCategoria = Object.keys(query).length > 0;
+
   try {
-    const { data } = await api.get<ApiResponse<Marca[] | { items: Marca[] }>>("/productos/marcas");
+    const { data } = await api.get<ApiResponse<Marca[] | { items: Marca[] }>>("/productos/marcas", {
+      params: query,
+    });
     const marcas = normalizeMarcas(unwrapMarcas(data.data));
-    return marcas.length > 0 ? marcas : MARCAS_FALLBACK;
+    if (marcas.length > 0) return marcas;
+    return filtradasPorCategoria ? [] : MARCAS_FALLBACK;
   } catch {
-    return MARCAS_FALLBACK;
+    return filtradasPorCategoria ? [] : MARCAS_FALLBACK;
   }
 }
