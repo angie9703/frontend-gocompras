@@ -2,11 +2,17 @@
 
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { AdminSwitch } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { adminCardClass, adminFieldClass } from "@/lib/adminUi";
 
-export type CatalogoItem = { id: number; nombre: string };
+export type CatalogoItem = {
+  id: number;
+  nombre: string;
+  esDestacada?: boolean;
+  ordenDestacada?: number;
+};
 
 export function CatalogoGestionModal({
   kind,
@@ -15,6 +21,7 @@ export function CatalogoGestionModal({
   onCreate,
   onDelete,
   onRename,
+  onUpdateHome,
 }: {
   kind: "categoria" | "marca";
   items: CatalogoItem[];
@@ -22,6 +29,10 @@ export function CatalogoGestionModal({
   onCreate: (nombre: string) => Promise<void>;
   onDelete: (item: CatalogoItem) => Promise<void>;
   onRename?: (item: CatalogoItem, nombre: string) => Promise<void>;
+  onUpdateHome?: (
+    item: CatalogoItem,
+    payload: { esDestacada: boolean; ordenDestacada: number },
+  ) => Promise<void>;
 }) {
   const titleId = useId();
   const isCategoria = kind === "categoria";
@@ -35,6 +46,8 @@ export function CatalogoGestionModal({
   const [editingName, setEditingName] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [savingHomeId, setSavingHomeId] = useState<number | null>(null);
+  const [ordenDraft, setOrdenDraft] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -122,6 +135,32 @@ export function CatalogoGestionModal({
     }
   };
 
+  const saveHome = async (item: CatalogoItem, destacada: boolean, ordenRaw: string) => {
+    if (!onUpdateHome) return;
+    const orden = Number(ordenRaw);
+    if (!Number.isInteger(orden) || orden < 0 || orden > 9999) {
+      setError("El orden en Home tiene que ser un número entero entre 0 y 9999.");
+      return;
+    }
+    if (destacada === Boolean(item.esDestacada) && orden === (item.ordenDestacada ?? 0)) return;
+
+    setSavingHomeId(item.id);
+    setError(null);
+    try {
+      await onUpdateHome(item, { esDestacada: destacada, ordenDestacada: orden });
+      setOrdenDraft((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      setToast("La categoría se actualizó correctamente.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar la categoría.");
+    } finally {
+      setSavingHomeId(null);
+    }
+  };
+
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center p-4">
       <button type="button" className="absolute inset-0 bg-slate-950/40" aria-label="Cerrar gestión" onClick={onClose} />
@@ -129,13 +168,13 @@ export function CatalogoGestionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col ${adminCardClass} p-5`}
+        className={`relative z-10 flex max-h-[85vh] w-full flex-col ${adminCardClass} p-5 ${isCategoria ? "max-w-2xl" : "max-w-lg"}`}
       >
         <h4 id={titleId} className="text-lg font-semibold text-slate-900">
           {isCategoria ? "Gestionar categorías" : "Gestionar marcas"}
         </h4>
         <p className="mt-1 text-sm text-slate-500">
-          Creá una nueva {label} o eliminá una existente. Si tiene productos asociados, no se va a poder borrar.
+          Creá una nueva {label}, renombrala o eliminala. En categorías también podés elegir cuáles aparecen en la home.
         </p>
 
         <label className={`${adminFieldClass} mt-4`}>
@@ -166,74 +205,112 @@ export function CatalogoGestionModal({
           ) : (
             visibles.map((item) => {
               const editing = isCategoria && editingCategoryId === item.id;
+              const ordenValue = ordenDraft[item.id] ?? String(item.ordenDestacada ?? 0);
+              const destacada = Boolean(item.esDestacada);
               return (
-                <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50">
-                  {editing ? (
-                    <Input
-                      value={editingName}
-                      onChange={(event) => setEditingName(event.target.value)}
-                      aria-label={`Nuevo nombre de ${item.nombre}`}
-                      className="min-h-9"
-                      autoFocus
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          void saveEdit(item);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="truncate text-sm font-medium text-slate-800">{item.nombre}</span>
-                  )}
-                  <div className="flex shrink-0 items-center">
+                <li key={item.id} className="rounded-lg px-2 py-2 hover:bg-slate-50">
+                  <div className="flex items-center justify-between gap-2">
                     {editing ? (
-                      <>
-                        <button
-                          type="button"
-                          className="inline-flex size-9 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                          aria-label="Guardar"
-                          disabled={savingEdit || editingName.trim().length < 2}
-                          onClick={() => void saveEdit(item)}
-                        >
-                          <Check className="size-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
-                          aria-label="Cancelar"
-                          disabled={savingEdit}
-                          onClick={cancelEdit}
-                        >
-                          <X className="size-4" />
-                        </button>
-                      </>
+                      <Input
+                        value={editingName}
+                        onChange={(event) => setEditingName(event.target.value)}
+                        aria-label={`Nuevo nombre de ${item.nombre}`}
+                        className="min-h-9"
+                        autoFocus
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            void saveEdit(item);
+                          }
+                        }}
+                      />
                     ) : (
-                      <>
-                        {isCategoria && onRename ? (
+                      <span className="truncate text-sm font-medium text-slate-800">{item.nombre}</span>
+                    )}
+                    <div className="flex shrink-0 items-center">
+                      {editing ? (
+                        <>
+                          <button
+                            type="button"
+                            className="inline-flex size-9 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                            aria-label="Guardar"
+                            disabled={savingEdit || editingName.trim().length < 2}
+                            onClick={() => void saveEdit(item)}
+                          >
+                            <Check className="size-4" />
+                          </button>
                           <button
                             type="button"
                             className="inline-flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
-                            aria-label={`Editar ${item.nombre}`}
-                            onClick={() => startEdit(item)}
+                            aria-label="Cancelar"
+                            disabled={savingEdit}
+                            onClick={cancelEdit}
                           >
-                            <Pencil className="size-4" />
+                            <X className="size-4" />
                           </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="inline-flex size-9 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50"
-                          aria-label={`Eliminar ${item.nombre}`}
-                          disabled={deletingId === item.id}
-                          onClick={() => {
-                            setError(null);
-                            setPending(item);
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </>
-                    )}
+                        </>
+                      ) : (
+                        <>
+                          {isCategoria && onRename ? (
+                            <button
+                              type="button"
+                              className="inline-flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+                              aria-label={`Editar ${item.nombre}`}
+                              onClick={() => startEdit(item)}
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="inline-flex size-9 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50"
+                            aria-label={`Eliminar ${item.nombre}`}
+                            disabled={deletingId === item.id}
+                            onClick={() => {
+                              setError(null);
+                              setPending(item);
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
+                  {isCategoria && onUpdateHome ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <span className="text-xs font-medium text-slate-600">Destacar en la Home</span>
+                      <AdminSwitch
+                        checked={destacada}
+                        disabled={savingHomeId === item.id}
+                        label={`Destacar ${item.nombre} en la Home`}
+                        onChange={(next) => void saveHome(item, next, ordenValue)}
+                      />
+                      <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                        Orden en Home
+                        <input
+                          type="number"
+                          min={0}
+                          max={9999}
+                          inputMode="numeric"
+                          value={ordenValue}
+                          disabled={savingHomeId === item.id}
+                          aria-label={`Orden en Home de ${item.nombre}`}
+                          className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-800"
+                          onChange={(event) =>
+                            setOrdenDraft((current) => ({ ...current, [item.id]: event.target.value }))
+                          }
+                          onBlur={(event) => void saveHome(item, destacada, event.currentTarget.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void saveHome(item, destacada, ordenValue);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  ) : null}
                 </li>
               );
             })

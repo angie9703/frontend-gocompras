@@ -84,7 +84,7 @@ export function ProductDetail({ producto }: ProductDetailProps) {
   ];
 
   return (
-    <article className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 py-8">
+    <article className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 pt-8 pb-20 md:py-8">
       <Link href="/productos" className="text-sm font-medium text-primary hover:underline">
         ← Volver al catálogo
       </Link>

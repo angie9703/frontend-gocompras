@@ -41,7 +41,18 @@ export interface Categoria {
   nombre: string;
   slug: string;
   activo?: boolean;
+  esDestacada?: boolean;
+  ordenDestacada?: number;
   subcategorias?: string[];
+}
+
+export interface CategoriaDestacada {
+  id: number;
+  titulo: string;
+  nombre: string;
+  slug: string;
+  imagenUrl: string | null;
+  orden?: number;
 }
 
 export interface Marca {

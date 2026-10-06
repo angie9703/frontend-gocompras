@@ -2,7 +2,7 @@
 
 import { FileText, MapPin, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { WhatsAppIcon } from "@/components/ui/SocialIcons";
 import { cn } from "@/lib/cn";
 import { useAjustes } from "@/store/useAjustesStore";
@@ -38,7 +38,7 @@ export function HeroBanner() {
 }
 
 const benefitCardClass =
-  "flex h-full cursor-pointer gap-3 rounded-xl border border-slate-100 bg-surface p-4 text-left transition-colors hover:border-primary/40 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+  "flex w-[82%] min-w-0 flex-[0_0_82%] snap-start items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:w-full md:flex-1 md:basis-auto";
 
 function BenefitCardContent({
   icon,
@@ -51,12 +51,12 @@ function BenefitCardContent({
 }) {
   return (
     <>
-      <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         {icon}
       </div>
-      <div>
-        <h3 className="font-semibold text-main">{title}</h3>
-        <p className="mt-1 text-sm text-muted">{description}</p>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm font-semibold text-main">{title}</h3>
+        <p className="mt-0.5 text-xs leading-snug text-muted">{description}</p>
       </div>
     </>
   );
@@ -71,11 +71,44 @@ export function BenefitsBar() {
       ? ajustes.whatsapp.trim()
       : `+${ajustes.whatsapp.trim()}`
     : "";
-  const atencionDescripcion = whatsappVisible
-    ? `Asesoramiento por WhatsApp al ${whatsappVisible} para armar tu pedido o resolver dudas.`
-    : "Asesoramiento por WhatsApp para armar tu pedido o resolver dudas.";
   const [infoOpen, setInfoOpen] = useState(false);
+  const [activeBenefit, setActiveBenefit] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const dialogTitleId = useId();
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    const updateActive = () => {
+      const count = scroller.children.length;
+      if (count <= 1) {
+        setActiveBenefit(0);
+        return;
+      }
+      const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+      const next =
+        maxScroll <= 1 ? 0 : Math.round((scroller.scrollLeft / maxScroll) * (count - 1));
+      setActiveBenefit((current) => (current === next ? current : next));
+    };
+
+    updateActive();
+    scroller.addEventListener("scroll", updateActive, { passive: true });
+    window.addEventListener("resize", updateActive);
+    return () => {
+      scroller.removeEventListener("scroll", updateActive);
+      window.removeEventListener("resize", updateActive);
+    };
+  }, []);
+
+  const scrollToBenefit = (index: number) => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const count = scroller.children.length;
+    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+    const left = count <= 1 ? 0 : (maxScroll * index) / (count - 1);
+    scroller.scrollTo({ left, behavior: "smooth" });
+  };
 
   useEffect(() => {
     if (!infoOpen) return;
@@ -95,8 +128,12 @@ export function BenefitsBar() {
   }, [infoOpen]);
 
   return (
-    <section id="puntos-seguros" className="border-b border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 md:grid-cols-3">
+    <section id="puntos-seguros" className="pb-20 md:pb-0">
+      <div className="border-y border-slate-100 bg-slate-50 py-6">
+        <div
+          ref={scrollerRef}
+          className="mx-auto flex max-w-7xl snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 scrollbar-none md:grid md:grid-cols-3 md:overflow-visible md:px-4"
+        >
         {whatsappUrl ? (
           <a
             href={whatsappUrl}
@@ -106,43 +143,60 @@ export function BenefitsBar() {
             aria-label={`Escribir por WhatsApp al ${whatsappVisible}`}
           >
             <BenefitCardContent
-              icon={<WhatsAppIcon className="size-5" aria-hidden />}
+              icon={<WhatsAppIcon className="size-4" aria-hidden />}
               title="Atención Directa"
-              description={atencionDescripcion}
+              description="Asesoramiento personalizado por WhatsApp para armar tu pedido."
             />
           </a>
         ) : (
           <div className={benefitCardClass}>
             <BenefitCardContent
-              icon={<WhatsAppIcon className="size-5" aria-hidden />}
+              icon={<WhatsAppIcon className="size-4" aria-hidden />}
               title="Atención Directa"
-              description={atencionDescripcion}
+              description="Asesoramiento personalizado por WhatsApp para armar tu pedido."
             />
           </div>
         )}
 
         <Link href="/productos" className={benefitCardClass} aria-label="Ir al catálogo para armar un presupuesto">
           <BenefitCardContent
-            icon={<FileText className="size-5" aria-hidden />}
+            icon={<FileText className="size-4" aria-hidden />}
             title="Presupuesto Inmediato"
-            description="Descargá el presupuesto en PDF y compartilo con tu cliente o tu obra."
+            description="Recibí tu cotización en PDF lista para presentar o guardar."
           />
         </Link>
 
         <button
           type="button"
-          className={cn(benefitCardClass, "w-full cursor-pointer")}
+          className={cn(benefitCardClass, "cursor-pointer")}
           onClick={() => setInfoOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={infoOpen}
-          aria-label="Ver cómo funcionan los envíos y puntos seguros"
+          aria-label="Ver cómo funcionan los envíos y retiros"
         >
           <BenefitCardContent
-            icon={<MapPin className="size-5" aria-hidden />}
-            title="Envíos y Puntos Seguros"
-            description="Coordiná el envío a domicilio o retirá en estaciones y supermercados. No pedimos tu dirección exacta al comprar."
+            icon={<MapPin className="size-4" aria-hidden />}
+            title="Envíos y Retiros"
+            description="Retirá en Puntos Seguros o coordinamos el envío a tu obra."
           />
-        </button>
+          </button>
+        </div>
+        <div className="mt-3 flex justify-center gap-2 md:hidden" role="tablist" aria-label="Beneficios">
+          {["Atención Directa", "Presupuesto Inmediato", "Envíos y Retiros"].map((label, index) => (
+            <button
+              key={label}
+              type="button"
+              role="tab"
+              aria-selected={activeBenefit === index}
+              aria-label={label}
+              className={cn(
+                "size-2 rounded-full transition-colors",
+                activeBenefit === index ? "bg-primary" : "bg-slate-300",
+              )}
+              onClick={() => scrollToBenefit(index)}
+            />
+          ))}
+        </div>
       </div>
 
       {infoOpen ? (

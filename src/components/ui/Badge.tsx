@@ -28,12 +28,15 @@ export function Badge({ kind, variant, className, children, ...props }: BadgePro
   const preset = kind ? kindPresets[kind] : undefined;
   const resolvedVariant = variant ?? preset?.variant ?? "primary";
   const content = children ?? preset?.label;
+  const enStock = kind === "stock";
 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide",
-        variantClasses[resolvedVariant],
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs tracking-wide",
+        enStock
+          ? "bg-green-50 font-medium text-green-700"
+          : cn("font-semibold", variantClasses[resolvedVariant]),
         className,
       )}
       {...props}

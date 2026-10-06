@@ -365,7 +365,7 @@ export function CatalogView() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-6 md:py-10">
+    <section className="mx-auto w-full max-w-7xl px-4 pt-6 pb-20 md:py-10">
       <header className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-main md:text-3xl">{title}</h1>

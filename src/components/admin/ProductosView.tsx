@@ -173,6 +173,7 @@ export function ProductosView() {
   const [error, setError] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Producto | null>(null);
+  const [editingSku, setEditingSku] = useState<string | null>(null);
   const [cargaOpen, setCargaOpen] = useState(false);
   const [stockTarget, setStockTarget] = useState<InventarioFila | null>(null);
   const [stockValue, setStockValue] = useState("");
@@ -428,6 +429,7 @@ export function ProductosView() {
 
   const openCreate = () => {
     setEditing(null);
+    setEditingSku(null);
     setEditorOpen(true);
   };
 
@@ -436,6 +438,7 @@ export function ProductosView() {
     try {
       const response = await getProductoById(fila.productoId);
       setEditing(response.data);
+      setEditingSku(fila.sku);
       setEditorOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo abrir el producto.");
@@ -971,11 +974,15 @@ export function ProductosView() {
 
       {editorOpen ? (
         <ProductoEditorDrawer
-          key={editing?.id ?? "nuevo"}
+          key={`${editing?.id ?? "nuevo"}-${editingSku ?? ""}`}
           producto={editing}
+          sku={editingSku}
           categorias={categorias}
           marcas={marcas}
-          onClose={() => setEditorOpen(false)}
+          onClose={() => {
+            setEditorOpen(false);
+            setEditingSku(null);
+          }}
           onCreatedCategoria={(categoria) => setCategorias((current) => [...current, categoria])}
           onUpdatedCategoria={(categoria) =>
             setCategorias((current) =>

@@ -43,6 +43,14 @@
   @apply min-h-11 rounded-lg;
 }
 
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 body {
   background: var(--surface);
   color: var(--text-main);

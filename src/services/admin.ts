@@ -321,9 +321,12 @@ export async function listAdminMarcas(): Promise<{ id: number; nombre: string }[
   }
 }
 
-export async function updateAdminCategoria(id: number, nombre: string): Promise<Categoria> {
+export async function updateAdminCategoria(
+  id: number,
+  payload: { nombre?: string; esDestacada?: boolean; ordenDestacada?: number },
+): Promise<Categoria> {
   try {
-    const { data } = await api.put<ApiResponse<Categoria>>(`/categorias/${id}`, { nombre });
+    const { data } = await api.put<ApiResponse<Categoria>>(`/categorias/${id}`, payload);
     return data.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo actualizar la categoría."));
@@ -569,8 +572,37 @@ export type AdminVariantePayload = Partial<{
   stock: number;
   precioOferta: number | null;
   atributos: Record<string, string> | null;
+  imagenUrl: string | null;
   activo: boolean;
 }>;
+
+export interface AdminSkuImagen {
+  id: number;
+  productoId: number;
+  sku: string;
+  nombre: string;
+  imagenUrl: string | null;
+}
+
+export async function getAdminProductoPorSku(sku: string): Promise<AdminSkuImagen> {
+  try {
+    const { data } = await api.get<ApiResponse<AdminSkuImagen>>(
+      `/admin/productos/sku/${encodeURIComponent(sku)}`,
+    );
+    return data.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "No se pudo cargar la imagen de este SKU."));
+  }
+}
+
+export async function uploadAdminImage(payload: { file: string; sku?: string }): Promise<{ secure_url: string }> {
+  try {
+    const { data } = await api.post<ApiResponse<{ secure_url: string }>>("/admin/upload-image", payload);
+    return data.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "No se pudo subir la imagen."));
+  }
+}
 
 export async function createAdminProducto(payload: {
   nombre: string;
@@ -590,6 +622,7 @@ export async function createAdminProducto(payload: {
     precio: number;
     precioOferta?: number | null;
     stock: number;
+    imagenUrl?: string | null;
     atributos?: Record<string, string>;
     activo?: boolean;
   }>;

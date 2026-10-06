@@ -43,11 +43,11 @@ export function FeaturedProducts() {
   }, []);
 
   return (
-    <section id="destacados" className="mx-auto w-full max-w-7xl px-4 py-12 md:py-16">
+    <section id="destacados" className="mx-auto w-full max-w-7xl px-4 py-8 md:py-16">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-main">Productos destacados</h2>
-          <p className="mt-1 text-sm text-muted">Una selección corta para arrancar el pedido.</p>
+          <p className="mt-1 text-sm text-muted">Armá tu pedido y solicitá tu cotización al instante por WhatsApp.</p>
         </div>
         <Link
           href="/productos"

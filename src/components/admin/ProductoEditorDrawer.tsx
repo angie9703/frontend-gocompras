@@ -1,7 +1,7 @@
 "use client";
 
-import { ImageOff, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { ImageOff, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CatalogoGestionModal } from "@/components/admin/CatalogoGestionModal";
 import { ManageBrandsModal } from "@/components/admin/ManageBrandsModal";
 import { ManageSubcategoriesModal } from "@/components/admin/ManageSubcategoriesModal";
@@ -14,9 +14,11 @@ import {
   createAdminCategoria,
   createAdminProducto,
   deleteAdminCategoria,
+  getAdminProductoPorSku,
   updateAdminCategoria,
   updateAdminProducto,
   updateAdminVariante,
+  uploadAdminImage,
 } from "@/services/admin";
 import type { Categoria, Marca, Producto, Variante } from "@/types";
 
@@ -29,8 +31,62 @@ const TABS: Array<{ id: EditorTab; label: string }> = [
   { id: "specs", label: "Especificaciones" },
 ];
 
-function firstVariante(producto: Producto | null): Variante | undefined {
-  return producto?.variantes[0];
+function varianteDelSku(producto: Producto | null, sku?: string | null): Variante | undefined {
+  if (!producto) return undefined;
+  const buscado = sku?.trim();
+  if (buscado) {
+    const encontrada = producto.variantes.find((item) => item.sku === buscado);
+    if (encontrada) return encontrada;
+  }
+  return producto.variantes[0];
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("No se pudo leer la imagen."));
+    };
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function compressImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const maxSide = 1600;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("No se pudo preparar la imagen."));
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("No se pudo leer la imagen."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function fileToUploadDataUrl(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("El archivo tiene que ser una imagen.");
+  }
+  if (file.size <= 1_500_000) return readFileAsDataUrl(file);
+  return compressImageFile(file);
 }
 
 function toAttrRows(atributos: Record<string, string> | null | undefined): Array<{ key: string; value: string }> {
@@ -81,6 +137,7 @@ function subcategoriasDeCategoria(categoriaId: string, categorias: Categoria[]):
 
 export function ProductoEditorDrawer({
   producto,
+  sku: skuEdicion = null,
   categorias,
   marcas,
   onClose,
@@ -96,6 +153,7 @@ export function ProductoEditorDrawer({
   onRequestDelete,
 }: {
   producto: Producto | null;
+  sku?: string | null;
   categorias: Categoria[];
   marcas: Marca[];
   onClose: () => void;
@@ -118,8 +176,9 @@ export function ProductoEditorDrawer({
   onRequestDelete?: () => void;
 }) {
   const titleId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isCreate = producto == null;
-  const variante = firstVariante(producto);
+  const variante = varianteDelSku(producto, skuEdicion);
   const [tab, setTab] = useState<EditorTab>("general");
   const [nombre, setNombre] = useState(producto?.nombre ?? "");
   const [sku, setSku] = useState(variante?.sku ?? "");
@@ -134,11 +193,11 @@ export function ProductoEditorDrawer({
   const [grupoId, setGrupoId] = useState(producto?.grupoId ?? "");
   const [orden, setOrden] = useState(producto?.orden != null ? String(producto.orden) : "");
   const [destacado, setDestacado] = useState(producto?.destacado ?? false);
-  const [imagenes, setImagenes] = useState<string[]>(
-    producto?.imagenes?.length ? producto.imagenes : producto?.imagenUrl ? [producto.imagenUrl] : [],
-  );
-  const [nuevaImagen, setNuevaImagen] = useState("");
-  const [previewIndex, setPreviewIndex] = useState(0);
+  const [portada, setPortada] = useState("");
+  const [urlBorrador, setUrlBorrador] = useState("");
+  const [portadaLista, setPortadaLista] = useState(isCreate);
+  const [imagenLoading, setImagenLoading] = useState(!isCreate && Boolean(skuEdicion?.trim() || variante?.sku));
+  const [uploading, setUploading] = useState(false);
   const [specs, setSpecs] = useState(toAttrRows(variante?.atributos));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -185,19 +244,69 @@ export function ProductoEditorDrawer({
     });
   };
 
-  const addImagen = (url: string) => {
-    const clean = url.trim();
+  useEffect(() => {
+    const skuConsulta = (skuEdicion ?? variante?.sku ?? "").trim();
+    if (isCreate || !skuConsulta) {
+      setImagenLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setImagenLoading(true);
+    setPortada("");
+    void getAdminProductoPorSku(skuConsulta)
+      .then((data) => {
+        if (cancelled) return;
+        setPortada(data.imagenUrl?.trim() ?? "");
+        setPortadaLista(true);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setPortada("");
+        setPortadaLista(false);
+        setError(err instanceof Error ? err.message : "No se pudo cargar la imagen de este SKU.");
+      })
+      .finally(() => {
+        if (!cancelled) setImagenLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCreate, skuEdicion, variante?.sku]);
+
+  const aplicarUrl = () => {
+    const clean = urlBorrador.trim();
     if (!isHttpUrl(clean)) {
       setError("La imagen tiene que ser una URL http o https.");
       return;
     }
     setError(null);
-    setImagenes((current) => (current.includes(clean) ? current : [...current, clean]));
-    setNuevaImagen("");
-    setPreviewIndex(imagenes.length);
+    setPortada(clean);
+    setPortadaLista(true);
+    setUrlBorrador("");
+  };
+
+  const subirArchivo = async (file: File) => {
+    setUploading(true);
+    setError(null);
+    try {
+      const fileData = await fileToUploadDataUrl(file);
+      const imagen = await uploadAdminImage({
+        file: fileData,
+        sku: sku.trim() || undefined,
+      });
+      setPortada(imagen.secure_url);
+      setPortadaLista(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo subir la imagen.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const save = async () => {
+    if (imagenLoading || uploading) return;
     if (!nombre.trim() || !sku.trim() || precio === "") {
       setError("Completá nombre, SKU y precio lista.");
       setTab("general");
@@ -220,6 +329,7 @@ export function ProductoEditorDrawer({
       return;
     }
 
+    const portadaUrl = portada.trim() || null;
     const payloadProducto = {
       nombre: nombre.trim(),
       descripcion: descripcion.trim() || null,
@@ -231,8 +341,12 @@ export function ProductoEditorDrawer({
       categoriaId: categoriaId ? Number(categoriaId) : null,
       marcaId: marcaId ? Number(marcaId) : null,
       subcategoria: subcategoria.trim() || null,
-      imagenUrl: imagenes[0] ?? null,
-      imagenes,
+      ...(isCreate
+        ? {
+            imagenUrl: portadaUrl,
+            imagenes: portadaUrl ? [portadaUrl] : [],
+          }
+        : {}),
     };
     const atributos = rowsToAtributos(specs);
 
@@ -248,6 +362,7 @@ export function ProductoEditorDrawer({
               precio: precioNumero,
               precioOferta: ofertaNumero != null && ofertaNumero > 0 ? ofertaNumero : null,
               stock: stockNumero,
+              imagenUrl: portadaUrl,
               atributos,
               activo: true,
             },
@@ -265,6 +380,7 @@ export function ProductoEditorDrawer({
             precio: precioNumero,
             stock: stockNumero,
             precioOferta: ofertaNumero != null && ofertaNumero > 0 ? ofertaNumero : null,
+            ...(portadaLista ? { imagenUrl: portadaUrl } : {}),
             atributos,
           }),
         ]);
@@ -292,7 +408,7 @@ export function ProductoEditorDrawer({
               {isCreate ? "Nuevo producto" : "Editar producto"}
             </h3>
             <p className="mt-1 text-xs text-slate-500">
-              {isCreate ? "Completá las solapas y publicá el ítem en el catálogo." : `SKU ${variante?.sku ?? "—"}`}
+              {isCreate ? "Completá las solapas y publicá el ítem en el catálogo." : `SKU ${skuEdicion ?? variante?.sku ?? "—"}`}
             </p>
           </div>
           <button
@@ -513,84 +629,82 @@ export function ProductoEditorDrawer({
 
           {tab === "imagenes" ? (
             <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  value={nuevaImagen}
-                  onChange={(event) => setNuevaImagen(event.target.value)}
-                  placeholder="https://… URL de la foto"
-                  aria-label="URL de imagen"
-                />
-                <Button variant="subtle" onClick={() => addImagen(nuevaImagen)} disabled={!nuevaImagen.trim()}>
-                  Agregar
-                </Button>
+              <p className="text-sm text-slate-500">
+                Portada de este SKU{sku.trim() ? ` (${sku.trim()})` : ""}. La foto no se comparte con las otras variantes.
+              </p>
+
+              <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                {imagenLoading || uploading ? (
+                  <div className="flex h-64 flex-col items-center justify-center gap-2 text-slate-500">
+                    <Loader2 className="size-8 animate-spin" />
+                    <p className="text-sm">{uploading ? "Subiendo imagen…" : "Cargando la foto del SKU…"}</p>
+                  </div>
+                ) : portada ? (
+                  <>
+                    <img src={portada} alt="" className="h-64 w-full object-contain" />
+                    <span className="absolute top-3 left-3 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+                      Portada
+                    </span>
+                  </>
+                ) : (
+                  <div className="flex h-64 flex-col items-center justify-center text-slate-500">
+                    <ImageOff className="size-8" />
+                    <p className="mt-2 text-sm">Este SKU todavía no tiene foto de portada.</p>
+                  </div>
+                )}
               </div>
-              <label className="block text-sm text-slate-500">
-                Carga local (vista previa). Para publicarla en la tienda, pegá después una URL pública.
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  loading={uploading}
+                  disabled={imagenLoading}
+                >
+                  <Upload className="size-4" />
+                  {portada ? "Reemplazar foto" : "Subir Imagen"}
+                </Button>
+                {portada && !uploading ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setPortada("");
+                      setPortadaLista(true);
+                    }}
+                    disabled={imagenLoading}
+                  >
+                    Quitar
+                  </Button>
+                ) : null}
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  className="mt-2 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                  className="sr-only"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
                     event.target.value = "";
                     if (!file) return;
-                    setError("El servidor no aloja archivos. Usá el campo de URL para guardar la foto en el catálogo.");
+                    void subirArchivo(file);
                   }}
                 />
-              </label>
+              </div>
 
-              {imagenes.length === 0 ? (
-                <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-500">
-                  <div className="text-center">
-                    <ImageOff className="mx-auto size-8" />
-                    <p className="mt-2 text-sm">Todavía no hay fotos en la galería.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_140px]">
-                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                    <img src={imagenes[previewIndex] ?? imagenes[0]} alt="" className="h-64 w-full object-contain" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 md:grid-cols-1">
-                    {imagenes.map((url, index) => (
-                      <div key={url} className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewIndex(index)}
-                          className={`overflow-hidden rounded-lg border ${
-                            previewIndex === index ? "border-primary ring-2 ring-primary/30" : "border-slate-200"
-                          }`}
-                        >
-                          <img src={url} alt="" className="h-16 w-full object-cover" />
-                        </button>
-                        <div className="mt-1 flex gap-1">
-                          <button
-                            type="button"
-                            className="flex-1 rounded bg-slate-100 px-1 py-0.5 text-[10px] font-semibold text-slate-700"
-                            onClick={() => {
-                              setImagenes((current) => [url, ...current.filter((item) => item !== url)]);
-                              setPreviewIndex(0);
-                            }}
-                          >
-                            Portada
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded bg-rose-50 px-1 py-0.5 text-rose-700"
-                            aria-label="Quitar imagen"
-                            onClick={() => {
-                              setImagenes((current) => current.filter((item) => item !== url));
-                              setPreviewIndex(0);
-                            }}
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  value={urlBorrador}
+                  onChange={(event) => setUrlBorrador(event.target.value)}
+                  placeholder="O pegá una URL https://…"
+                  aria-label="URL de imagen"
+                  disabled={imagenLoading || uploading}
+                />
+                <Button
+                  variant="subtle"
+                  onClick={aplicarUrl}
+                  disabled={imagenLoading || uploading || !urlBorrador.trim()}
+                >
+                  Usar URL
+                </Button>
+              </div>
             </div>
           ) : null}
 
@@ -656,7 +770,12 @@ export function ProductoEditorDrawer({
             <Button variant="ghost" onClick={onClose}>
               Cancelar
             </Button>
-            <Button variant="dark" onClick={() => void save()} loading={saving}>
+            <Button
+              variant="dark"
+              onClick={() => void save()}
+              loading={saving}
+              disabled={imagenLoading || uploading}
+            >
               {isCreate ? "Crear producto" : "Guardar cambios"}
             </Button>
           </div>
@@ -688,7 +807,11 @@ export function ProductoEditorDrawer({
             handleCategoriaChange(String(categoria.id));
           }}
           onRename={async (item, nombreNuevo) => {
-            const categoria = await updateAdminCategoria(item.id, nombreNuevo);
+            const categoria = await updateAdminCategoria(item.id, { nombre: nombreNuevo });
+            onUpdatedCategoria?.(categoria);
+          }}
+          onUpdateHome={async (item, payload) => {
+            const categoria = await updateAdminCategoria(item.id, payload);
             onUpdatedCategoria?.(categoria);
           }}
           onDelete={async (item) => {

@@ -1,58 +1,58 @@
 "use client";
 
-import { Box, Cable, LayoutGrid, Lightbulb, Wrench, Zap } from "lucide-react";
+import { Package } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { buildCatalogPath } from "@/lib/catalogQuery";
-import { getCategorias } from "@/services/categorias";
-import type { Categoria } from "@/types";
-
-const CATEGORY_ICONS = [
-  Cable,
-  Zap,
-  Lightbulb,
-  Box,
-  Wrench,
-  LayoutGrid,
-];
+import { getCategoriasDestacadas } from "@/services/categorias";
+import type { CategoriaDestacada } from "@/types";
 
 export function PopularCategories() {
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaDestacada[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    void getCategorias()
+
+    void getCategoriasDestacadas()
       .then((items) => {
-        if (!cancelled) setCategorias(items.slice(0, 5));
+        if (!cancelled) setCategorias(items);
+      })
+      .catch(() => {
+        if (!cancelled) setCategorias([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
   }, []);
 
+  if (!loading && categorias.length === 0) return null;
+
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-12 md:py-16">
-      <div className="mb-6 flex items-end justify-between gap-3">
+    <section className="mx-auto w-full max-w-7xl py-6 md:py-16">
+      <div className="mb-4 flex items-end justify-between gap-3 px-4">
         <div>
           <h2 className="text-2xl font-semibold text-main">Categorías populares</h2>
-          <p className="mt-1 text-sm text-muted">Entrá directo al rubro que estás buscando.</p>
+          <p className="mt-1 text-sm text-muted">Deslizá para ver todos los rubros.</p>
         </div>
-        <Link href="/productos" className="hidden text-sm font-semibold text-primary hover:underline sm:inline">
+        <Link href="/productos" className="hidden shrink-0 text-sm font-semibold text-primary hover:underline sm:inline">
           Ver todas
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="flex flex-nowrap space-x-4 overflow-x-auto scroll-smooth px-4 scrollbar-none">
         {loading
-          ? Array.from({ length: 5 }, (_, index) => (
-              <div key={index} className="product-card h-28 animate-pulse" />
+          ? Array.from({ length: 6 }, (_, index) => (
+              <div key={index} className="w-[5.75rem] shrink-0">
+                <div className="size-[5.75rem] animate-pulse rounded-full bg-slate-200" />
+                <div className="mx-auto mt-2 h-3 w-14 animate-pulse rounded bg-slate-200" />
+              </div>
             ))
-          : categorias.map((categoria, index) => {
-              const Icon = CATEGORY_ICONS[index % CATEGORY_ICONS.length];
+          : categorias.map((categoria) => {
               const href = buildCatalogPath(new URLSearchParams(), {
                 categoria: categoria.slug,
                 categoriaId: categoria.id > 0 ? categoria.id : null,
@@ -61,12 +61,18 @@ export function PopularCategories() {
                 <Link
                   key={`${categoria.id}-${categoria.slug}`}
                   href={href}
-                  className="product-card flex flex-col items-start gap-3 p-4 transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  className="w-[5.75rem] shrink-0"
                 >
-                  <span className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Icon className="size-5" aria-hidden />
+                  <span className="flex size-[5.75rem] items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-gray-100">
+                    {categoria.imagenUrl ? (
+                      <img src={categoria.imagenUrl} alt="" className="size-full object-cover" />
+                    ) : (
+                      <Package className="size-7 text-gray-400" aria-hidden />
+                    )}
                   </span>
-                  <span className="text-sm font-semibold text-main">{categoria.nombre}</span>
+                  <span className="mt-2 line-clamp-2 block text-center text-xs font-semibold leading-4 text-main">
+                    {categoria.titulo}
+                  </span>
                 </Link>
               );
             })}

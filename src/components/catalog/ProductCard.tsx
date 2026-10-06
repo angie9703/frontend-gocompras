@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingBag } from "lucide-react";
+import { Package, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { type ChangeEvent, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
@@ -14,6 +14,7 @@ import {
   tituloTarjetaProducto,
   toCartItem,
 } from "@/lib/catalog";
+import { cn } from "@/lib/cn";
 import { getDescuentoPorcentaje, tienePrecioOferta } from "@/lib/pricing";
 import { useCartStore } from "@/store/useCartStore";
 import type { Producto, Variante } from "@/types";
@@ -56,11 +57,14 @@ export function ProductCard({ producto }: ProductCardProps) {
     <article className="product-card flex h-full flex-col justify-between p-3 sm:p-4">
       <div className="flex flex-1 flex-col">
         <Link href={`/productos/${producto.id}`} className="group block">
-          <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-lg bg-white sm:h-52 md:h-60">
+          <div
+            className={cn(
+              "relative flex h-40 items-center justify-center overflow-hidden rounded-lg sm:h-52 md:h-60",
+              mostrarPlaceholder ? "bg-gray-100" : "bg-white",
+            )}
+          >
             {mostrarPlaceholder ? (
-              <div className="flex size-full items-center justify-center bg-slate-50">
-                <img src="/logo.ico" alt="" className="size-14 object-contain opacity-50" />
-              </div>
+              <Package className="size-10 text-gray-400" aria-hidden />
             ) : (
               <img
                 src={imagenUrl}
@@ -83,17 +87,15 @@ export function ProductCard({ producto }: ProductCardProps) {
           ) : null}
         </Link>
 
-        <p className="mt-1 text-[11px] leading-4 text-gray-400">SKU {selectedVariant?.sku ?? "—"}</p>
-
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
           {selectedVariant ? (
             <PriceDisplay
               source={selectedVariant}
               size="sm"
-              className="min-w-0 [&_p.text-accent]:font-bold [&_p.text-primary]:font-bold"
+              className="min-w-0 [&_p:not(.line-through)]:text-base [&_p:not(.line-through)]:font-bold [&_p:not(.line-through)]:text-gray-900 md:[&_p:not(.line-through)]:text-lg"
             />
           ) : (
-            <p className="text-sm font-bold text-primary">Consultar</p>
+            <p className="text-base font-bold text-gray-900 md:text-lg">Consultar</p>
           )}
           <Badge kind={enStock ? "stock" : "consultar"} className="shrink-0" />
         </div>
@@ -119,12 +121,12 @@ export function ProductCard({ producto }: ProductCardProps) {
       <div className="mt-auto pt-3">
         <Button
           variant="accent"
-          className="w-full px-2 text-xs sm:text-sm"
+          className="w-full gap-1.5 px-2! py-2! text-center text-xs! leading-tight whitespace-normal sm:gap-2 sm:px-3! sm:py-2.5! sm:text-sm!"
           disabled={!selectedVariant || !enStock}
           onClick={onAddToCart}
         >
-          <ShoppingBag className="size-4" aria-hidden />
-          Agregar al Presupuesto
+          <ShoppingBag className="size-3.5 shrink-0 sm:size-4" aria-hidden />
+          Agregar al presupuesto
         </Button>
       </div>
     </article>
