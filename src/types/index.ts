@@ -321,7 +321,12 @@ export interface Banner {
   ctaLabel: string | null;
   ctaHref: string | null;
   linkDestino?: string | null;
+  link_url?: string | null;
+  linkUrl?: string | null;
   imagenUrl: string | null;
+  imagen_url?: string | null;
+  imagenMobileUrl?: string | null;
+  imagen_mobile_url?: string | null;
   activo: boolean;
   publicado?: boolean;
   orden: number;

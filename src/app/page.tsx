@@ -1,11 +1,12 @@
+import { BannerCarousel } from "@/components/home/BannerCarousel";
 import { FeaturedProducts } from "@/components/home/FeaturedProducts";
-import { BenefitsBar, HeroBanner } from "@/components/home/HeroBanner";
+import { BenefitsBar } from "@/components/home/HeroBanner";
 import { PopularCategories } from "@/components/home/PopularCategories";
 
 export default function HomePage() {
   return (
     <>
-      <HeroBanner />
+      <BannerCarousel />
       <PopularCategories />
       <FeaturedProducts />
       <BenefitsBar />

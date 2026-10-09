@@ -983,28 +983,6 @@ export function ProductosView() {
             setEditorOpen(false);
             setEditingSku(null);
           }}
-          onCreatedCategoria={(categoria) => setCategorias((current) => [...current, categoria])}
-          onUpdatedCategoria={(categoria) =>
-            setCategorias((current) =>
-              current.map((item) =>
-                item.id === categoria.id ? { ...item, nombre: categoria.nombre, slug: categoria.slug } : item,
-              ),
-            )
-          }
-          onCreatedMarca={(marca) =>
-            setMarcas((current) =>
-              [...current.filter((item) => item.id > 0 && item.id !== marca.id), marca].sort((a, b) =>
-                a.nombre.localeCompare(b.nombre, "es"),
-              ),
-            )
-          }
-          onUpdatedMarca={(marca) =>
-            setMarcas((current) =>
-              current
-                .map((item) => (item.id === marca.id ? { ...item, nombre: marca.nombre } : item))
-                .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
-            )
-          }
           onSubcategoriasSync={(id, nombres, change) => {
             setCategorias((current) =>
               current.map((item) => (item.id === id ? { ...item, subcategorias: nombres } : item)),
@@ -1015,14 +993,6 @@ export function ProductosView() {
             if (change.type === "delete") {
               setSelectedSubcategoria((current) => (current === change.nombre ? "" : current));
             }
-          }}
-          onDeletedCategoria={(id) => {
-            setCategorias((current) => current.filter((item) => item.id !== id));
-            setCategoriaId((current) => (current === String(id) ? "" : current));
-          }}
-          onDeletedMarca={(id) => {
-            setMarcas((current) => current.filter((item) => item.id !== id));
-            setSelectedMarca((current) => (current === String(id) ? "" : current));
           }}
           onSaved={async () => {
             await reload();

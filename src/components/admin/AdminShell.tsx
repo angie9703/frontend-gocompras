@@ -8,12 +8,26 @@ import { cn } from "@/lib/cn";
 import { isStaffRole } from "@/lib/staff";
 import { useAuthStore } from "@/store/useAuthStore";
 
-const NAV = [
+const NAV: Array<{
+  href: string;
+  label: string;
+  icon: string;
+  exact?: boolean;
+  children?: Array<{ href: string; label: string }>;
+}> = [
   { href: "/admin", label: "Dashboard / Resumen", icon: "📊", exact: true },
   { href: "/admin/pedidos", label: "Pedidos y Presupuestos", icon: "📦" },
-  { href: "/admin/productos", label: "Productos e Inventario", icon: "🏷️" },
+  {
+    href: "/admin/productos",
+    label: "Productos e Inventario",
+    icon: "🏷️",
+    children: [
+      { href: "/admin/productos/categorias", label: "Categorías" },
+      { href: "/admin/productos/marcas", label: "Marcas" },
+    ],
+  },
   { href: "/admin/promociones", label: "Cupones y Promociones", icon: "🎟️" },
-  { href: "/admin/banners", label: "Banner Promocional", icon: "🖼️" },
+  { href: "/admin/banners", label: "Banners Promocionales", icon: "🖼️" },
   { href: "/admin/clientes", label: "Clientes / CRM", icon: "👥" },
   { href: "/admin/ajustes", label: "Ajustes", icon: "cog" },
 ];
@@ -72,19 +86,37 @@ export function AdminShell({ children }: { children: ReactNode }) {
         {NAV.map((item) => {
           const active = navActive(pathname, item.href, item.exact);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
-                active ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10 hover:text-white",
-              )}
-            >
-              <span aria-hidden className="flex w-6 items-center justify-center">
-                {item.icon === "cog" ? <Cog className="size-4" /> : item.icon}
-              </span>
-              {item.label}
-            </Link>
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                  active ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10 hover:text-white",
+                )}
+              >
+                <span aria-hidden className="flex w-6 items-center justify-center">
+                  {item.icon === "cog" ? <Cog className="size-4" /> : item.icon}
+                </span>
+                {item.label}
+              </Link>
+              {item.children?.map((child) => {
+                const childActive = pathname === child.href;
+                return (
+                  <Link
+                    key={child.href}
+                    href={child.href}
+                    className={cn(
+                      "mt-1 flex min-h-9 items-center rounded-lg py-2 pr-3 pl-12 text-sm transition-colors",
+                      childActive
+                        ? "bg-white/15 font-medium text-white"
+                        : "text-slate-400 hover:bg-white/10 hover:text-white",
+                    )}
+                  >
+                    {child.label}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>

@@ -1,9 +1,8 @@
 "use client";
 
 import { ImageOff, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { CatalogoGestionModal } from "@/components/admin/CatalogoGestionModal";
-import { ManageBrandsModal } from "@/components/admin/ManageBrandsModal";
 import { ManageSubcategoriesModal } from "@/components/admin/ManageSubcategoriesModal";
 import { GrupoVariantesCombobox } from "@/components/admin/GrupoVariantesCombobox";
 import { AdminSwitch } from "@/components/admin/ui";
@@ -11,11 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { adminCardClass, adminFieldClass, selectClass, tabClass, textareaClass } from "@/lib/adminUi";
 import {
-  createAdminCategoria,
   createAdminProducto,
-  deleteAdminCategoria,
   getAdminProductoPorSku,
-  updateAdminCategoria,
   updateAdminProducto,
   updateAdminVariante,
   uploadAdminImage,
@@ -142,12 +138,6 @@ export function ProductoEditorDrawer({
   marcas,
   onClose,
   onSaved,
-  onCreatedCategoria,
-  onCreatedMarca,
-  onUpdatedMarca,
-  onUpdatedCategoria,
-  onDeletedCategoria,
-  onDeletedMarca,
   onSubcategoriasSync,
   confirmingDelete = false,
   onRequestDelete,
@@ -158,12 +148,6 @@ export function ProductoEditorDrawer({
   marcas: Marca[];
   onClose: () => void;
   onSaved: () => Promise<void> | void;
-  onCreatedCategoria?: (categoria: Categoria) => void;
-  onCreatedMarca?: (marca: Marca) => void;
-  onUpdatedMarca?: (marca: Marca) => void;
-  onUpdatedCategoria?: (categoria: Categoria) => void;
-  onDeletedCategoria?: (id: number) => void;
-  onDeletedMarca?: (id: number) => void;
   onSubcategoriasSync?: (
     categoriaId: number,
     nombres: string[],
@@ -201,7 +185,6 @@ export function ProductoEditorDrawer({
   const [specs, setSpecs] = useState(toAttrRows(variante?.atributos));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [quickCreate, setQuickCreate] = useState<null | "categoria" | "marca">(null);
   const [gestionSub, setGestionSub] = useState(false);
 
   const marcasReales = useMemo(() => marcas.filter((marca) => marca.id > 0), [marcas]);
@@ -219,7 +202,7 @@ export function ProductoEditorDrawer({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (quickCreate || gestionSub || confirmingDelete) return;
+      if (gestionSub || confirmingDelete) return;
       onClose();
     };
     const previous = document.body.style.overflow;
@@ -229,7 +212,7 @@ export function ProductoEditorDrawer({
       document.body.style.overflow = previous;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose, quickCreate, gestionSub, confirmingDelete]);
+  }, [onClose, gestionSub, confirmingDelete]);
 
   const handleCategoriaChange = (nextId: string) => {
     setCategoriaId(nextId);
@@ -457,14 +440,12 @@ export function ProductoEditorDrawer({
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    aria-label="Gestionar categorías"
-                    onClick={() => setQuickCreate("categoria")}
+                  <Link
+                    href="/admin/productos/categorias"
+                    className="inline-flex h-11 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    <Plus className="size-4" />
-                  </button>
+                    Gestionar
+                  </Link>
                 </div>
               </div>
               <div className={adminFieldClass}>
@@ -509,14 +490,12 @@ export function ProductoEditorDrawer({
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    aria-label="Gestionar marcas"
-                    onClick={() => setQuickCreate("marca")}
+                  <Link
+                    href="/admin/productos/marcas"
+                    className="inline-flex h-11 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    <Plus className="size-4" />
-                  </button>
+                    Gestionar
+                  </Link>
                 </div>
               </div>
               <label className={`${adminFieldClass} md:col-span-2`}>
@@ -796,49 +775,6 @@ export function ProductoEditorDrawer({
         />
       ) : null}
 
-      {quickCreate === "categoria" ? (
-        <CatalogoGestionModal
-          kind="categoria"
-          items={categorias}
-          onClose={() => setQuickCreate(null)}
-          onCreate={async (nombreNuevo) => {
-            const categoria = await createAdminCategoria(nombreNuevo);
-            onCreatedCategoria?.(categoria);
-            handleCategoriaChange(String(categoria.id));
-          }}
-          onRename={async (item, nombreNuevo) => {
-            const categoria = await updateAdminCategoria(item.id, { nombre: nombreNuevo });
-            onUpdatedCategoria?.(categoria);
-          }}
-          onUpdateHome={async (item, payload) => {
-            const categoria = await updateAdminCategoria(item.id, payload);
-            onUpdatedCategoria?.(categoria);
-          }}
-          onDelete={async (item) => {
-            await deleteAdminCategoria(item.id);
-            onDeletedCategoria?.(item.id);
-            if (categoriaId === String(item.id)) handleCategoriaChange("");
-          }}
-        />
-      ) : null}
-
-      {quickCreate === "marca" ? (
-        <ManageBrandsModal
-          items={marcasReales}
-          onClose={() => setQuickCreate(null)}
-          onCreated={(marca) => {
-            onCreatedMarca?.({ id: marca.id, nombre: marca.nombre, activo: true });
-            setMarcaId(String(marca.id));
-          }}
-          onUpdated={(marca) => {
-            onUpdatedMarca?.({ id: marca.id, nombre: marca.nombre, activo: true });
-          }}
-          onDeleted={(id) => {
-            onDeletedMarca?.(id);
-            setMarcaId((current) => (current === String(id) ? "" : current));
-          }}
-        />
-      ) : null}
     </div>
   );
 }

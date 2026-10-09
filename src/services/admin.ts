@@ -161,11 +161,15 @@ export async function listAdminBanners(): Promise<Banner[]> {
 }
 
 export async function createAdminBanner(payload: {
-  titulo: string;
+  titulo?: string | null;
   subtitulo?: string | null;
   ctaLabel?: string | null;
   ctaHref?: string | null;
   imagenUrl?: string | null;
+  imagenMobileUrl?: string | null;
+  imagen_mobile_url?: string | null;
+  link_url?: string | null;
+  linkDestino?: string | null;
   orden?: number;
   activo?: boolean;
   publicado?: boolean;
@@ -173,8 +177,12 @@ export async function createAdminBanner(payload: {
   tarjeta2Visible?: boolean;
   tarjeta3Visible?: boolean;
 }): Promise<Banner> {
-  const { data } = await api.post<ApiResponse<Banner>>("/admin/banners", payload);
-  return data.data;
+  try {
+    const { data } = await api.post<ApiResponse<Banner>>("/admin/banners", payload);
+    return data.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "No se pudo crear el banner."));
+  }
 }
 
 export async function updateAdminBanner(
@@ -185,6 +193,10 @@ export async function updateAdminBanner(
     ctaLabel: string | null;
     ctaHref: string | null;
     imagenUrl: string | null;
+    imagenMobileUrl: string | null;
+    imagen_mobile_url: string | null;
+    link_url: string | null;
+    linkDestino: string | null;
     orden: number;
     activo: boolean;
     publicado: boolean;
@@ -193,8 +205,12 @@ export async function updateAdminBanner(
     tarjeta3Visible: boolean;
   }>,
 ): Promise<Banner> {
-  const { data } = await api.patch<ApiResponse<Banner>>(`/admin/banners/${id}`, payload);
-  return data.data;
+  try {
+    const { data } = await api.patch<ApiResponse<Banner>>(`/admin/banners/${id}`, payload);
+    return data.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "No se pudo actualizar el banner."));
+  }
 }
 
 export async function deleteAdminBanner(id: number): Promise<void> {

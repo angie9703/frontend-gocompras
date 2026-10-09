@@ -7,36 +7,6 @@ import { WhatsAppIcon } from "@/components/ui/SocialIcons";
 import { cn } from "@/lib/cn";
 import { useAjustes } from "@/store/useAjustesStore";
 
-export function HeroBanner() {
-  return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-primary-dark via-primary to-[#2b4aa3] text-white">
-      <div className="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-14 md:py-20">
-        <p className="text-sm font-semibold tracking-wide text-secondary uppercase">Go Compras</p>
-        <h1 className="max-w-3xl text-3xl font-bold leading-tight md:text-5xl">
-          Materiales Eléctricos para Tu Proyecto y Hogar
-        </h1>
-        <p className="max-w-2xl text-base text-white/85 md:text-lg">
-          Venta directa con retiro en Puntos Seguros o envíos a convenir.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/productos"
-            className="btn-touch inline-flex items-center justify-center bg-accent px-5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
-          >
-            Explorar Catálogo
-          </Link>
-          <Link
-            href="/productos"
-            className="btn-touch inline-flex items-center justify-center border border-white/30 bg-white/10 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/20"
-          >
-            Ver Ofertas
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const benefitCardClass =
   "flex w-[82%] min-w-0 flex-[0_0_82%] snap-start items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:w-full md:flex-1 md:basis-auto";
 
