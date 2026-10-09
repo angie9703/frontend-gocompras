@@ -7,6 +7,7 @@ import { AdminSwitch } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { adminCardClass, adminFieldClass, adminTableHeadClass, adminTableRowClass } from "@/lib/adminUi";
+import { getCloudinaryUploadConfig, uploadCloudinaryImage } from "@/lib/cloudinary";
 import {
   createAdminCategoria,
   createAdminMarca,
@@ -20,7 +21,6 @@ import {
   updateAdminCategoria,
   updateMarca,
   updateSubcategoria,
-  uploadAdminImage,
   type SubcategoriaItem,
 } from "@/services/admin";
 
@@ -372,10 +372,17 @@ function CategoriaEditModal({
   const upload = async (file: File) => {
     setUploading(true);
     setError(null);
+    const cloudinary = getCloudinaryUploadConfig();
+    if (!cloudinary) {
+      setUploading(false);
+      setError(
+        "Cloudinary no está configurado. Definí NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME y NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+      );
+      return;
+    }
     try {
       const dataUrl = await fileToUploadDataUrl(file);
-      const imagen = await uploadAdminImage({ file: dataUrl });
-      setImagenUrl(imagen.secure_url);
+      setImagenUrl(await uploadCloudinaryImage(dataUrl, cloudinary));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo subir la imagen.");
     } finally {

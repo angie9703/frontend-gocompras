@@ -7,12 +7,12 @@ import { AdminSwitch } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { adminCardClass, adminFieldClass, adminTableHeadClass, adminTableRowClass } from "@/lib/adminUi";
+import { getCloudinaryUploadConfig, uploadCloudinaryImage } from "@/lib/cloudinary";
 import {
   createAdminBanner,
   deleteAdminBanner,
   listAdminBanners,
   updateAdminBanner,
-  uploadAdminImage,
 } from "@/services/admin";
 import type { Banner } from "@/types";
 
@@ -121,11 +121,19 @@ export function BannersView() {
   const upload = async (file: File, target: "desktop" | "mobile") => {
     setUploading(target);
     setError(null);
+    const cloudinary = getCloudinaryUploadConfig();
+    if (!cloudinary) {
+      setUploading(null);
+      setError(
+        "Cloudinary no está configurado. Definí NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME y NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+      );
+      return;
+    }
     try {
       const dataUrl = await fileToUploadDataUrl(file);
-      const imagen = await uploadAdminImage({ file: dataUrl });
-      if (target === "desktop") setImagenUrl(imagen.secure_url);
-      else setImagenMobileUrl(imagen.secure_url);
+      const secureUrl = await uploadCloudinaryImage(dataUrl, cloudinary);
+      if (target === "desktop") setImagenUrl(secureUrl);
+      else setImagenMobileUrl(secureUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo subir la imagen.");
     } finally {
