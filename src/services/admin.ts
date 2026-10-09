@@ -339,7 +339,12 @@ export async function listAdminMarcas(): Promise<{ id: number; nombre: string }[
 
 export async function updateAdminCategoria(
   id: number,
-  payload: { nombre?: string; esDestacada?: boolean; ordenDestacada?: number },
+  payload: {
+    nombre?: string;
+    esDestacada?: boolean;
+    ordenDestacada?: number;
+    imagenUrl?: string | null;
+  },
 ): Promise<Categoria> {
   try {
     const { data } = await api.put<ApiResponse<Categoria>>(`/categorias/${id}`, payload);

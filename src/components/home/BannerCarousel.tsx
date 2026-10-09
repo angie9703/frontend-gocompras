@@ -86,14 +86,19 @@ export function BannerCarousel() {
   }, [count, dragging, hovering, index, loading]);
 
   if (loading) {
-    return <div className="h-56 w-full animate-pulse bg-slate-100 sm:h-72 md:h-[22rem]" aria-hidden />;
+    return (
+      <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
+        <div className="h-56 w-full animate-pulse rounded-2xl bg-slate-100 sm:h-72 md:h-[22rem]" aria-hidden />
+      </div>
+    );
   }
 
   if (count === 0) return null;
 
   return (
-    <section
-      className="relative w-full touch-pan-y overflow-hidden bg-slate-100"
+    <section className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
+    <div
+      className="relative w-full touch-pan-y overflow-hidden rounded-2xl bg-slate-100"
       aria-roledescription="carrusel"
       aria-label="Banners promocionales"
       onMouseEnter={() => setHovering(true)}
@@ -188,6 +193,7 @@ export function BannerCarousel() {
           </div>
         </>
       ) : null}
+    </div>
     </section>
   );
 }

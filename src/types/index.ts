@@ -43,6 +43,8 @@ export interface Categoria {
   activo?: boolean;
   esDestacada?: boolean;
   ordenDestacada?: number;
+  imagenUrl?: string | null;
+  imagen_url?: string | null;
   subcategorias?: string[];
 }
 

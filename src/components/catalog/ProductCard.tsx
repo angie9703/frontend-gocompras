@@ -21,9 +21,10 @@ import type { Producto, Variante } from "@/types";
 
 interface ProductCardProps {
   producto: Producto;
+  compact?: boolean;
 }
 
-export function ProductCard({ producto }: ProductCardProps) {
+export function ProductCard({ producto, compact = false }: ProductCardProps) {
   const variantes = useMemo(() => getActiveVariantes(producto), [producto]);
   const [selectedVariant, setSelectedVariant] = useState<Variante | undefined>(
     () => getDefaultVariante(producto) ?? getActiveVariantes(producto)[0],
@@ -59,7 +60,8 @@ export function ProductCard({ producto }: ProductCardProps) {
         <Link href={`/productos/${producto.id}`} className="group block">
           <div
             className={cn(
-              "relative flex h-40 items-center justify-center overflow-hidden rounded-lg sm:h-52 md:h-60",
+              "relative flex items-center justify-center overflow-hidden rounded-lg",
+              compact ? "h-40 sm:h-44" : "h-40 sm:h-52 md:h-60",
               mostrarPlaceholder ? "bg-gray-100" : "bg-white",
             )}
           >
@@ -79,7 +81,13 @@ export function ProductCard({ producto }: ProductCardProps) {
               </Badge>
             ) : null}
           </div>
-          <h3 className="mt-3 line-clamp-3 min-h-12 text-[13px] leading-4 font-semibold text-main group-hover:text-primary md:line-clamp-2 md:min-h-10 md:text-sm md:leading-5">
+          <h3
+            className={
+              compact
+                ? "mt-2 line-clamp-2 min-h-10 text-sm leading-5 font-medium text-slate-800 group-hover:text-primary"
+                : "mt-3 line-clamp-3 min-h-12 text-[13px] leading-4 font-semibold text-main group-hover:text-primary md:line-clamp-2 md:min-h-10 md:text-sm md:leading-5"
+            }
+          >
             {titulo}
           </h3>
           {especificacion ? (
@@ -92,7 +100,11 @@ export function ProductCard({ producto }: ProductCardProps) {
             <PriceDisplay
               source={selectedVariant}
               size="sm"
-              className="min-w-0 [&_p:not(.line-through)]:text-base [&_p:not(.line-through)]:font-bold [&_p:not(.line-through)]:text-gray-900 md:[&_p:not(.line-through)]:text-lg"
+              className={
+                compact
+                  ? "min-w-0 [&_p:not(.line-through)]:text-sm [&_p:not(.line-through)]:font-bold [&_p:not(.line-through)]:text-gray-900 sm:[&_p:not(.line-through)]:text-base"
+                  : "min-w-0 [&_p:not(.line-through)]:text-base [&_p:not(.line-through)]:font-bold [&_p:not(.line-through)]:text-gray-900 md:[&_p:not(.line-through)]:text-lg"
+              }
             />
           ) : (
             <p className="text-base font-bold text-gray-900 md:text-lg">Consultar</p>
@@ -121,7 +133,11 @@ export function ProductCard({ producto }: ProductCardProps) {
       <div className="mt-auto pt-3">
         <Button
           variant="accent"
-          className="w-full gap-1.5 px-2! py-2! text-center text-xs! leading-tight whitespace-normal sm:gap-2 sm:px-3! sm:py-2.5! sm:text-sm!"
+          className={
+            compact
+              ? "w-full gap-1.5 px-2! py-2! text-center text-xs! leading-tight whitespace-normal"
+              : "w-full gap-1.5 px-2! py-2! text-center text-xs! leading-tight whitespace-normal sm:gap-2 sm:px-3! sm:py-2.5! sm:text-sm!"
+          }
           disabled={!selectedVariant || !enStock}
           onClick={onAddToCart}
         >

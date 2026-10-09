@@ -7,13 +7,16 @@ interface ProductGridProps {
   productos: Producto[];
   loading?: boolean;
   className?: string;
+  layout?: "catalog" | "featured";
 }
 
-function ProductCardSkeleton() {
+const featuredGridClass = "grid grid-cols-2 items-stretch gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-5";
+
+function ProductCardSkeleton({ featured = false }: { featured?: boolean }) {
   return (
     <div className="product-card flex h-full animate-pulse flex-col justify-between p-3 sm:p-4">
       <div>
-        <div className="h-40 rounded-lg bg-slate-200 sm:h-52 md:h-60" />
+        <div className={featured ? "h-40 rounded-lg bg-slate-200 sm:h-44" : "h-40 rounded-lg bg-slate-200 sm:h-52 md:h-60"} />
         <div className="mt-3 h-12 w-full rounded bg-slate-200" />
         <div className="mt-2 h-4 w-2/3 rounded bg-slate-200" />
         <div className="mt-2 h-3 w-1/2 rounded bg-slate-200" />
@@ -24,12 +27,13 @@ function ProductCardSkeleton() {
   );
 }
 
-export function ProductGrid({ productos, loading = false, className }: ProductGridProps) {
+export function ProductGrid({ productos, loading = false, className, layout = "catalog" }: ProductGridProps) {
+  const gridClass = layout === "featured" ? featuredGridClass : "catalog-grid";
   if (loading) {
     return (
-      <div className={cn("catalog-grid", className)}>
-        {Array.from({ length: 8 }, (_, index) => (
-          <ProductCardSkeleton key={index} />
+      <div className={cn(gridClass, className)}>
+        {Array.from({ length: layout === "featured" ? 5 : 8 }, (_, index) => (
+          <ProductCardSkeleton key={index} featured={layout === "featured"} />
         ))}
       </div>
     );
@@ -49,9 +53,9 @@ export function ProductGrid({ productos, loading = false, className }: ProductGr
   }
 
   return (
-    <div className={cn("catalog-grid", className)}>
+    <div className={cn(gridClass, className)}>
       {productos.map((producto) => (
-        <ProductCard key={producto.id} producto={producto} />
+        <ProductCard key={producto.id} producto={producto} compact={layout === "featured"} />
       ))}
     </div>
   );
