@@ -6,6 +6,7 @@
   --primary-dark: #14255a;
   --accent: #ff5500;
   --accent-hover: #e04b00;
+  --brand-orange: #ff8e16;
   --secondary: #ffc72c;
   --surface: #f8fafc;
   --text-main: #0f172a;
@@ -17,6 +18,7 @@
   --color-primary-dark: var(--primary-dark);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-brand-orange: var(--brand-orange);
   --color-secondary: var(--secondary);
   --color-surface: var(--surface);
   --color-main: var(--text-main);

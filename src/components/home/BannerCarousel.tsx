@@ -18,6 +18,29 @@ function bannerImages(banner: Banner): { desktop: string | null; mobile: string 
   return { desktop, mobile };
 }
 
+function bannerOrden(banner: Banner): number {
+  const orden = Number(banner.orden);
+  return Number.isFinite(orden) ? orden : 0;
+}
+
+function bannerEstaActivo(banner: Banner, now = Date.now()): boolean {
+  if (banner.activo === false || banner.publicado === false) return false;
+  if (banner.fechaInicio) {
+    const inicio = Date.parse(banner.fechaInicio);
+    if (Number.isFinite(inicio) && inicio > now) return false;
+  }
+  if (banner.fechaFin) {
+    const fin = Date.parse(banner.fechaFin);
+    if (Number.isFinite(fin) && fin < now) return false;
+  }
+  const images = bannerImages(banner);
+  return Boolean(images.desktop || images.mobile);
+}
+
+function esControl(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest("[data-carousel-control]"));
+}
+
 function SlideFrame({ href, label, children }: { href: string | null; label: string; children: ReactNode }) {
   if (!href) return <div className="relative block h-full w-full">{children}</div>;
   if (href.startsWith("/")) {
@@ -38,8 +61,8 @@ export function BannerCarousel() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
-  const [hovering, setHovering] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [manualTick, setManualTick] = useState(0);
   const drag = useRef({ x: 0, moved: false });
 
   useEffect(() => {
@@ -48,12 +71,8 @@ export function BannerCarousel() {
       .then((items) => {
         if (cancelled) return;
         const visibles = items
-          .filter((item) => item.activo !== false && item.publicado !== false)
-          .filter((item) => {
-            const images = bannerImages(item);
-            return Boolean(images.desktop || images.mobile);
-          })
-          .sort((a, b) => a.orden - b.orden || a.id - b.id);
+          .filter((item) => bannerEstaActivo(item))
+          .sort((a, b) => bannerOrden(a) - bannerOrden(b) || a.id - b.id);
         setBanners(visibles);
       })
       .catch(() => {
@@ -71,19 +90,19 @@ export function BannerCarousel() {
   const go = useCallback(
     (next: number) => {
       if (count < 1) return;
-      setIndex((next + count) % count);
+      setIndex(((next % count) + count) % count);
+      setManualTick((tick) => tick + 1);
     },
     [count],
   );
 
   useEffect(() => {
-    if (loading || count < 2 || hovering || dragging) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (loading || count < 2 || dragging) return;
     const timer = window.setInterval(() => {
       setIndex((current) => (current + 1) % count);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [count, dragging, hovering, index, loading]);
+  }, [count, dragging, loading, manualTick]);
 
   if (loading) {
     return (
@@ -96,14 +115,13 @@ export function BannerCarousel() {
   if (count === 0) return null;
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
+    <section className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:pt-6">
     <div
       className="relative w-full touch-pan-y overflow-hidden rounded-2xl bg-slate-100"
       aria-roledescription="carrusel"
       aria-label="Banners promocionales"
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
       onPointerDown={(event) => {
+        if (esControl(event.target)) return;
         if (event.pointerType === "mouse" && event.button !== 0) return;
         drag.current = { x: event.clientX, moved: false };
         setDragging(true);
@@ -129,7 +147,7 @@ export function BannerCarousel() {
       }}
     >
       <div
-        className="flex h-56 transition-transform duration-500 ease-out sm:h-72 md:h-[22rem]"
+        className="relative z-0 flex h-56 transition-transform duration-500 ease-out sm:h-72 md:h-[22rem]"
         style={{ transform: `translateX(-${index * 100}%)` }}
       >
         {banners.map((banner) => {
@@ -159,39 +177,45 @@ export function BannerCarousel() {
       </div>
 
       {count > 1 ? (
-        <>
+        <div className="pointer-events-none absolute inset-0 z-30">
           <button
             type="button"
-            className="absolute top-1/2 left-3 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-md hover:bg-white md:inline-flex"
+            data-carousel-control
+            className="pointer-events-auto absolute top-1/2 left-3 z-30 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-md hover:bg-white md:inline-flex"
             aria-label="Banner anterior"
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={() => go(index - 1)}
           >
             <ChevronLeft className="size-5" />
           </button>
           <button
             type="button"
-            className="absolute top-1/2 right-3 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-md hover:bg-white md:inline-flex"
+            data-carousel-control
+            className="pointer-events-auto absolute top-1/2 right-3 z-30 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-md hover:bg-white md:inline-flex"
             aria-label="Banner siguiente"
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={() => go(index + 1)}
           >
             <ChevronRight className="size-5" />
           </button>
-          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2">
+          <div className="absolute inset-x-0 bottom-3 z-30 flex items-center justify-center gap-2">
             {banners.map((banner, dot) => (
               <button
                 key={banner.id}
                 type="button"
+                data-carousel-control
                 aria-label={`Ir al banner ${dot + 1}`}
                 aria-current={dot === index ? "true" : undefined}
                 className={cn(
-                  "h-2 rounded-full bg-white shadow transition-all",
+                  "pointer-events-auto relative z-30 h-2 rounded-full bg-white shadow transition-all",
                   dot === index ? "w-6" : "w-2 bg-white/70",
                 )}
+                onPointerDown={(event) => event.stopPropagation()}
                 onClick={() => go(dot)}
               />
             ))}
           </div>
-        </>
+        </div>
       ) : null}
     </div>
     </section>

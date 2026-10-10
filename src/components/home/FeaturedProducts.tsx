@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
@@ -43,17 +44,20 @@ export function FeaturedProducts() {
   }, []);
 
   return (
-    <section id="destacados" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 md:py-16">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-main">Productos destacados</h2>
-          <p className="mt-1 text-sm text-muted">Armá tu pedido y solicitá tu cotización al instante por WhatsApp.</p>
-        </div>
+    <section id="destacados" className="mx-auto w-full max-w-7xl px-4 pt-4 pb-8 sm:px-6 md:pb-16 lg:pt-6">
+      <div className="mb-3 flex items-center justify-between gap-3 sm:mb-6">
+        <h2 className="text-lg font-semibold text-main sm:text-2xl">Productos destacados</h2>
         <Link
           href="/productos"
-          className="btn-touch inline-flex items-center justify-center bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-dark"
+          className="group inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary hover:underline"
         >
-          Ver catálogo completo
+          <span className="sm:hidden">Ver todo</span>
+          <span className="hidden sm:inline">Ver catálogo completo</span>
+          <ChevronRight className="size-4 sm:hidden" aria-hidden />
+          <ArrowRight
+            className="hidden size-4 transition-transform group-hover:translate-x-0.5 sm:block"
+            aria-hidden
+          />
         </Link>
       </div>
       <ProductGrid productos={productos} loading={loading} layout="featured" />

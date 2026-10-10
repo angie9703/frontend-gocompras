@@ -6,10 +6,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CatalogFiltersPanel } from "@/components/catalog/CatalogFiltersPanel";
+import { CatalogRubrosSlider } from "@/components/catalog/CatalogRubrosSlider";
 import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { Button } from "@/components/ui/Button";
 import {
   getActiveVariantes,
+  getProductoImagen,
   marcasDesdeProductos,
   productoCoincideCategoria,
   productoCoincideMarca,
@@ -31,7 +33,7 @@ import {
 } from "@/lib/catalogQuery";
 import { cn } from "@/lib/cn";
 import { useHasMounted } from "@/lib/useHasMounted";
-import { getCategorias } from "@/services/categorias";
+import { getCategorias, getCategoriasDestacadas } from "@/services/categorias";
 import { getMarcas } from "@/services/marcas";
 import { getProductos } from "@/services/productos";
 import type { ApiErrorResponse, Categoria, Marca, Producto } from "@/types";
@@ -61,8 +63,20 @@ function applyClientFilters(productos: Producto[], query: CatalogQueryState): Pr
 
 const PAGE_SIZE = 12;
 
+function imagenesPorSubcategoria(productos: Producto[]): Record<string, string> {
+  const imagenes: Record<string, string> = {};
+  for (const producto of productos) {
+    const clave = producto.subcategoria?.trim().toLowerCase();
+    if (!clave || imagenes[clave]) continue;
+    const imagen = getProductoImagen(producto, getActiveVariantes(producto)[0]);
+    if (imagen) imagenes[clave] = imagen;
+  }
+  return imagenes;
+}
+
 function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = true) {
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [imagenesSubcategoria, setImagenesSubcategoria] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(enabled);
 
   useEffect(() => {
@@ -85,7 +99,7 @@ function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = tru
       ? getProductos({
           categoria: categoria || undefined,
           categoriaId: categoriaId || undefined,
-          pageSize: 100,
+          pageSize: 50,
         }).catch(() => null)
       : Promise.resolve(null);
 
@@ -94,6 +108,7 @@ function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = tru
         if (cancelled) return;
         if (!tieneCategoria || !productosResp) {
           setMarcas(apiMarcas);
+          setImagenesSubcategoria({});
           return;
         }
 
@@ -102,6 +117,7 @@ function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = tru
         );
         const derivadas = marcasDesdeProductos(enCategoria);
         setMarcas(derivadas.length > 0 ? derivadas : apiMarcas);
+        setImagenesSubcategoria(imagenesPorSubcategoria(enCategoria));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -112,13 +128,13 @@ function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = tru
     };
   }, [categoria, categoriaId, enabled]);
 
-  return { marcas, loading };
+  return { marcas, imagenesSubcategoria, loading };
 }
 
 export function CatalogFallback() {
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-8">
-      <div className="mb-6 h-8 w-48 animate-pulse rounded bg-slate-200" />
+    <section className="mx-auto w-full max-w-7xl px-4 pt-4 pb-20 md:pt-6 md:pb-10">
+      <div className="mb-4 h-8 w-48 animate-pulse rounded bg-slate-200" />
       <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="hidden h-80 animate-pulse rounded-xl bg-white lg:block" />
         <ProductGrid productos={[]} loading />
@@ -136,6 +152,7 @@ export function CatalogView() {
   const [total, setTotal] = useState(0);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriasLoading, setCategoriasLoading] = useState(true);
+  const [imagenesCategoria, setImagenesCategoria] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -152,6 +169,16 @@ export function CatalogView() {
       .finally(() => {
         if (!cancelled) setCategoriasLoading(false);
       });
+    void getCategoriasDestacadas()
+      .then((items) => {
+        if (cancelled) return;
+        const imagenes: Record<number, string> = {};
+        for (const item of items) {
+          if (item.imagenUrl) imagenes[item.id] = item.imagenUrl;
+        }
+        setImagenesCategoria(imagenes);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -294,130 +321,120 @@ export function CatalogView() {
     [totalPages],
   );
 
-  interface ActiveChip {
-    key: string;
-    label: string;
-    onRemove: () => void;
-  }
-
-  const activeChips: ActiveChip[] = [];
-  if (categoriaActiva) {
-    activeChips.push({
-      key: "categoria",
-      label: `Categoría: ${categoriaActiva.nombre}`,
-      onRemove: () => patchUrl({ categoria: "", categoriaId: "", subcategoria: "" }),
-    });
-  }
+  const filtrosActivos: { key: string; tipo: string; valor: string }[] = [];
   if (query.subcategoria) {
-    activeChips.push({
-      key: "subcategoria",
-      label: `Subcategoría: ${query.subcategoria}`,
-      onRemove: () => patchUrl({ subcategoria: "" }),
-    });
+    filtrosActivos.push({ key: "subcategoria", tipo: "Subcategoría", valor: query.subcategoria });
+  } else if (categoriaActiva) {
+    filtrosActivos.push({ key: "categoria", tipo: "Categoría", valor: categoriaActiva.nombre });
   }
-  for (const marca of marcasActivas) {
-    activeChips.push({
-      key: `marca-${marca.id}`,
-      label: `Marca: ${marca.nombre}`,
-      onRemove: () =>
-        patchUrl({
-          marcaId: parseMarcaIds(query.marcaId)
-            .filter((id) => id !== String(marca.id))
-            .join(","),
-        }),
+  if (marcasActivas.length > 0) {
+    filtrosActivos.push({
+      key: "marca",
+      tipo: marcasActivas.length === 1 ? "Marca" : "Marcas",
+      valor: marcasActivas.map((marca) => marca.nombre).join(", "),
     });
   }
   if (query.precioMin || query.precioMax) {
-    const min = query.precioMin || "0";
-    const max = query.precioMax || "∞";
-    activeChips.push({
+    filtrosActivos.push({
       key: "precio",
-      label: `Precio: $${min} - $${max}`,
-      onRemove: () => patchUrl({ precioMin: "", precioMax: "" }),
+      tipo: "Precio",
+      valor: `$${query.precioMin || "0"} - $${query.precioMax || "∞"}`,
     });
   }
-  if (query.enStock) {
-    activeChips.push({
-      key: "stock",
-      label: "Solo en stock",
-      onRemove: () => patchUrl({ enStock: false }),
-    });
-  }
-  if (query.ofertas) {
-    activeChips.push({
-      key: "ofertas",
-      label: "En oferta",
-      onRemove: () => patchUrl({ ofertas: false }),
-    });
-  }
+  if (query.enStock) filtrosActivos.push({ key: "stock", tipo: "Stock", valor: "Solo en stock" });
+  if (query.ofertas) filtrosActivos.push({ key: "ofertas", tipo: "Ofertas", valor: "En oferta" });
 
-  const title = query.q ? "Resultados de búsqueda" : "Catálogo";
-  const subtitle = query.q
-    ? `Coincidencias para "${query.q}".`
-    : query.subcategoria
-      ? `Filtrado por ${query.subcategoria}.`
-      : categoriaActiva
-        ? `Filtrado por ${categoriaActiva.nombre}.`
-        : "Filtrá por categoría, precio y stock para armar tu pedido.";
+  const title = query.q ? `Resultados para "${query.q}"` : "Catálogo";
 
   if (!hasMounted) {
     return <CatalogFallback />;
   }
 
+  const ordenSelect = (className: string) => (
+    <select
+      value={query.orden}
+      onChange={(event) => patchUrl({ orden: event.target.value })}
+      className={cn(
+        "rounded-lg border border-slate-300 px-3 text-sm text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary",
+        className,
+      )}
+      aria-label="Ordenar productos"
+    >
+      {CATALOG_ORDEN_OPTIONS.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 pt-6 pb-20 md:py-10">
-      <header className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-main md:text-3xl">{title}</h1>
-          <p className="mt-1 text-sm text-muted">{subtitle}</p>
+    <section className="mx-auto w-full max-w-7xl px-4 pt-4 pb-20 md:pt-6 md:pb-10">
+      <header className="mb-2 flex items-end justify-between gap-3 lg:mb-4">
+        <div className="flex min-w-0 items-end">
+          <h1 className="truncate text-2xl font-bold text-main md:text-3xl">{title}</h1>
           {!loading && !error ? (
-            <p className="mt-2 text-sm font-medium text-muted">
+            <span className="mb-1 ml-3 shrink-0 self-end text-xs text-slate-500 sm:text-sm">
               {total} {total === 1 ? "producto encontrado" : "productos encontrados"}
-            </p>
+            </span>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            className="lg:hidden"
-            onClick={() => {
-              setDraft(query);
-              setDrawerOpen(true);
-            }}
-          >
-            <SlidersHorizontal className="size-4" aria-hidden />
-            Filtrar y Ordenar
-            {activeCount > 0 ? (
-              <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] text-white">
-                {activeCount}
-              </span>
-            ) : null}
-          </Button>
-          {filtersActive ? (
-            <Link
-              href={clearCatalogFiltersPath()}
-              scroll={false}
-              className="btn-touch hidden items-center px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 lg:inline-flex"
-            >
-              Limpiar filtros
-            </Link>
-          ) : null}
+        <div className="hidden shrink-0 items-center gap-3 lg:flex">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <span className="text-muted">Ordenar</span>
+            {ordenSelect("min-h-10 bg-slate-50")}
+          </label>
         </div>
       </header>
 
-      {activeChips.length > 0 ? (
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          {activeChips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={chip.onRemove}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-            >
-              {chip.label}
-              <X className="size-3.5" aria-hidden />
-            </button>
-          ))}
+      <CatalogRubrosSlider
+        query={query}
+        categorias={categorias}
+        categoriaActiva={categoriaActiva}
+        imagenesCategoria={imagenesCategoria}
+        imagenesSubcategoria={marcasCatalogo.imagenesSubcategoria}
+        loading={categoriasLoading}
+        onChange={(patch) => patchUrl(patch)}
+      />
+
+      <div className="mb-4 flex items-center justify-between gap-2 lg:hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(query);
+            setDrawerOpen(true);
+          }}
+          className="inline-flex min-h-10 shrink-0 touch-manipulation items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-main hover:bg-primary/5"
+        >
+          <SlidersHorizontal className="size-4" aria-hidden />
+          Filtros
+          {activeCount > 0 ? (
+            <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] leading-none text-white">
+              {activeCount}
+            </span>
+          ) : null}
+        </button>
+        {ordenSelect("min-h-10 min-w-0 max-w-[60%] bg-white")}
+      </div>
+
+      {filtrosActivos.length > 0 ? (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-1.5 text-xs">
+          <p className="min-w-0 truncate font-normal text-slate-600">
+            {filtrosActivos.map((filtro, index) => (
+              <span key={filtro.key}>
+                {index > 0 ? <span className="mx-1.5 text-slate-300">·</span> : null}
+                {filtro.tipo}: <span className="font-semibold text-slate-900">{filtro.valor}</span>
+              </span>
+            ))}
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push(clearCatalogFiltersPath(), { scroll: false })}
+            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-slate-200/80 px-2.5 py-0.5 text-[11px] font-medium text-slate-700 transition-colors hover:bg-slate-300"
+          >
+            <X className="size-3" aria-hidden />
+            {filtrosActivos.length > 1 ? "Limpiar filtros" : "Limpiar filtro"}
+          </button>
         </div>
       ) : null}
 
@@ -442,24 +459,6 @@ export function CatalogView() {
         </aside>
 
         <div>
-          <div className="mb-4 hidden items-center justify-end lg:flex">
-            <label className="flex items-center gap-2 text-sm font-medium text-main">
-              <span className="text-muted">Ordenar</span>
-              <select
-                value={query.orden}
-                onChange={(event) => patchUrl({ orden: event.target.value })}
-                className="min-h-11 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                aria-label="Ordenar productos"
-              >
-                {CATALOG_ORDEN_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
           {error ? (
             <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center">
               <p className="font-semibold text-main">No se pudo cargar el catálogo</p>
@@ -563,7 +562,7 @@ export function CatalogView() {
         >
           <div className="relative z-10 flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <h2 id="catalog-filters-title" className="text-base font-semibold text-main">
-              Filtrar y Ordenar
+              Filtros
             </h2>
             <button
               type="button"
@@ -581,7 +580,6 @@ export function CatalogView() {
               categoriasLoading={categoriasLoading}
               marcas={categoriaDraftDistinta ? marcasDrawer.marcas : marcas}
               marcasLoading={categoriaDraftDistinta ? marcasDrawer.loading : marcasLoading}
-              showOrden
               onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
             />
           </div>
