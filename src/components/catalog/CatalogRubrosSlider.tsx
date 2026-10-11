@@ -169,9 +169,9 @@ export function CatalogRubrosSlider({
               >
                 <span
                   className={cn(
-                    "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-pink-100 bg-linear-to-br from-pink-300 via-rose-400 to-pink-50 text-rose-700 ring-brand-orange transition-all duration-200",
+                    "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#e8f6fe] bg-linear-to-b from-[#f0f9fe] to-[#e1f3ff] text-slate-500 transition-all duration-200",
                     !burbuja.cover && "p-2",
-                    burbuja.active ? "scale-105 shadow-md ring-[3px] ring-offset-2 ring-offset-white" : "ring-2",
+                    burbuja.active ? "scale-105 shadow-md ring-[3px] ring-brand-orange" : "ring-2 ring-[#c5d2d8]",
                   )}
                 >
                   {burbuja.todos ? (
