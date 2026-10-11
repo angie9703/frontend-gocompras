@@ -79,7 +79,7 @@ export function PopularCategories() {
                   centrarFila(index, categorias.length),
                 )}
               >
-                <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#dcefec] bg-linear-to-b from-[#f8f8f0] via-[#dcefec] to-[#b9e5ea] p-3 ring-2 ring-[#8bb8c2] isolate transition-[scale,box-shadow] duration-200 group-hover:scale-105 group-hover:ring-[#5f99a6] md:h-16 md:w-16 lg:h-28 lg:w-28 lg:p-5 lg:ring-[3px] lg:group-hover:shadow-md">
+                <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#dcefec] bg-linear-to-b from-[#f8f8f0] via-[#dcefec] to-[#b9e5ea] p-1.5 ring-2 ring-[#8bb8c2] isolate transition-[scale,box-shadow] duration-200 group-hover:scale-105 group-hover:ring-[#5f99a6] md:h-16 md:w-16 lg:h-28 lg:w-28 lg:p-2.5 lg:ring-[3px] lg:group-hover:shadow-md">
                   {categoria.imagenUrl ? (
                     <img src={categoria.imagenUrl} alt="" className="size-full object-contain" />
                   ) : (
