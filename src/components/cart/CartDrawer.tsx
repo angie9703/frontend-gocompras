@@ -2,7 +2,7 @@
 
 import { MapPin, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { PriceDisplay } from "@/components/product/PriceDisplay";
 import { formatARS } from "@/lib/money";
@@ -25,6 +25,7 @@ export function CartDrawer() {
   const visibleItems = hasMounted ? items : [];
   const subtotal = hasMounted ? getSubtotal() : 0;
   const open = hasMounted && isCartOpen;
+  const historyEntryRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -43,9 +44,32 @@ export function CartDrawer() {
     };
   }, [open, closeCart]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    window.history.pushState({ modalOpen: true }, "");
+    historyEntryRef.current = window.location.href;
+
+    const onPopState = () => {
+      historyEntryRef.current = null;
+      closeCart();
+    };
+    window.addEventListener("popstate", onPopState);
+
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      const href = historyEntryRef.current;
+      historyEntryRef.current = null;
+      // Si la URL ya cambió, la entrada del carrito no es la actual y volver atrás desharía esa navegación.
+      if (href && href === window.location.href) window.history.back();
+    };
+  }, [open, closeCart]);
+
   const goToCheckout = () => {
+    // `replace` reutiliza la entrada que empujó el carrito: "Atrás" desde el checkout vuelve a la página anterior.
+    historyEntryRef.current = null;
     closeCart();
-    router.push("/checkout");
+    router.replace("/checkout");
   };
 
   return (
