@@ -748,6 +748,14 @@ export async function updateAdminPedidoEstado(id: number, estado: Pedido["estado
   }
 }
 
+export async function deleteAdminPedido(id: number): Promise<void> {
+  try {
+    await api.delete(`/admin/pedidos/${id}`);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "No se pudo eliminar el presupuesto."));
+  }
+}
+
 export async function listAdminCupones(): Promise<Cupon[]> {
   try {
     const { data } = await api.get<ApiResponse<Cupon[]>>("/admin/cupones");
