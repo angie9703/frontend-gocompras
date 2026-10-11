@@ -20,23 +20,15 @@ interface Burbuja {
   key: string;
   label: string;
   imagen?: string;
-  cover?: boolean;
   todos?: boolean;
   active: boolean;
   onSelect: () => void;
 }
 
-function BurbujaImagen({ src, cover }: { src?: string; cover?: boolean }) {
+function BurbujaImagen({ src }: { src?: string }) {
   const [rota, setRota] = useState(false);
   if (!src || rota) return <Package className="size-5" aria-hidden />;
-  return (
-    <img
-      src={src}
-      alt=""
-      className={cover ? "size-full object-cover" : "size-full object-contain"}
-      onError={() => setRota(true)}
-    />
-  );
+  return <img src={src} alt="" className="size-full object-contain" onError={() => setRota(true)} />;
 }
 
 const RESET_FILTROS: Partial<CatalogQueryState> = {
@@ -121,17 +113,13 @@ export function CatalogRubrosSlider({
             active: !query.subcategoria,
             onSelect: () => seleccionarCategoria(categoriaActiva),
           },
-          ...subcategorias.map((nombre) => {
-            const imageUrl = fotosSubcategoria[nombre.trim().toLowerCase()] || undefined;
-            return {
-              key: `sub-${nombre}`,
-              label: nombre,
-              imagen: imageUrl,
-              cover: Boolean(imageUrl),
-              active: query.subcategoria === nombre,
-              onSelect: () => onChange({ subcategoria: nombre }),
-            };
-          }),
+          ...subcategorias.map((nombre) => ({
+            key: `sub-${nombre}`,
+            label: nombre,
+            imagen: fotosSubcategoria[nombre.trim().toLowerCase()] || undefined,
+            active: query.subcategoria === nombre,
+            onSelect: () => onChange({ subcategoria: nombre }),
+          })),
         ]
       : [
           todos,
@@ -169,15 +157,14 @@ export function CatalogRubrosSlider({
               >
                 <span
                   className={cn(
-                    "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#e8f6fe] bg-linear-to-b from-[#f0f9fe] to-[#e1f3ff] text-slate-500 transition-all duration-200",
-                    !burbuja.cover && "p-1.5",
+                    "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#e8f6fe] bg-linear-to-b from-[#f0f9fe] to-[#e1f3ff] p-1.5 text-slate-500 transition-all duration-200",
                     burbuja.active ? "scale-105 shadow-md ring-[3px] ring-brand-orange" : "ring-2 ring-[#c5d2d8]",
                   )}
                 >
                   {burbuja.todos ? (
                     <LayoutGrid className="size-5" aria-hidden />
                   ) : (
-                    <BurbujaImagen key={burbuja.imagen ?? ""} src={burbuja.imagen} cover={burbuja.cover} />
+                    <BurbujaImagen key={burbuja.imagen ?? ""} src={burbuja.imagen} />
                   )}
                 </span>
                 <span className="mt-1 line-clamp-2 h-8 w-full text-center text-[11px] leading-tight font-medium text-slate-600">
