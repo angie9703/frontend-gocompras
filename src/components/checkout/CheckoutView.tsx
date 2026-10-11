@@ -524,9 +524,9 @@ export function CheckoutView() {
           <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-primary">
             <ShoppingBag className="size-5 shrink-0" aria-hidden />
             <span className="truncate group-open:hidden">
-              Ver resumen ({cantidadProductos} {cantidadProductos === 1 ? "producto" : "productos"})
+              Ver pedido ({cantidadProductos} {cantidadProductos === 1 ? "producto" : "productos"})
             </span>
-            <span className="hidden truncate group-open:inline">Ocultar resumen</span>
+            <span className="hidden truncate group-open:inline">Ocultar pedido</span>
             <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
           </span>
           <span className="shrink-0 text-base font-bold text-slate-900">{formatARS(totalConCupon)}</span>
