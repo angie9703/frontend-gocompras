@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { SearchAutocomplete } from "@/components/layout/SearchAutocomplete";
 import { AccountMenu } from "@/components/layout/AccountMenu";
+import { CheckoutHeader } from "@/components/layout/CheckoutHeader";
 import { Badge } from "@/components/ui/Badge";
 import { FacebookIcon, InstagramIcon, WhatsAppIcon } from "@/components/ui/SocialIcons";
 import { buildCatalogPath } from "@/lib/catalogQuery";
@@ -68,9 +69,13 @@ export function Header() {
     setSearchOpen(false);
   };
 
+  if (pathname === "/checkout") {
+    return <CheckoutHeader nombreComercio={nombreComercio} />;
+  }
+
   return (
-    <header className="sticky top-0 z-40 overflow-visible border-b border-slate-200 bg-white shadow-sm">
-      <div className="mx-auto flex h-14 max-w-7xl flex-nowrap items-center gap-1.5 px-3 md:h-16 md:gap-3 md:px-4">
+    <header className="sticky top-0 z-40 w-full max-w-full overflow-x-clip border-b border-slate-200 bg-white shadow-sm">
+      <div className="mx-auto flex h-14 w-full max-w-7xl flex-nowrap items-center gap-1.5 px-3 md:h-16 md:gap-3 md:px-4">
         {!searchOpen ? (
           <button
             type="button"
@@ -86,15 +91,15 @@ export function Header() {
         {!searchOpen ? (
           <Link
             href="/"
-            className="shrink-0"
+            className="flex min-w-0 shrink items-center"
             aria-label={`${nombreComercio} - Materiales Eléctricos`}
           >
             <Image
-              src="/logo.png"
+              src="/logo-header.png"
               alt={`${nombreComercio} - Materiales Eléctricos`}
-              width={180}
-              height={50}
-              className="h-8 w-auto max-w-[100px] bg-transparent object-contain sm:max-w-none md:h-9"
+              width={212}
+              height={40}
+              className="h-5 w-auto min-w-0 max-w-full object-contain object-left lg:h-8"
               priority
             />
           </Link>
@@ -129,7 +134,12 @@ export function Header() {
           </button>
         </form>
 
-        <div className={cn("ml-auto flex min-w-0 items-center gap-0.5", searchOpen && "flex-1")}>
+        <div
+          className={cn(
+            "ml-auto flex items-center gap-1.5 lg:gap-0.5",
+            searchOpen ? "min-w-0 flex-1" : "shrink-0",
+          )}
+        >
           {searchOpen ? (
             <form onSubmit={onSearch} className="relative mr-1 min-w-0 flex-1 md:hidden">
               <SearchAutocomplete
@@ -148,7 +158,7 @@ export function Header() {
           ) : (
             <button
               type="button"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
               aria-label="Abrir búsqueda"
               onClick={() => setSearchOpen(true)}
             >
@@ -159,7 +169,7 @@ export function Header() {
           {searchOpen ? (
             <button
               type="button"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary hover:bg-primary/5 md:hidden"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/5 md:hidden"
               aria-label="Cerrar búsqueda"
               onClick={() => setSearchOpen(false)}
             >
@@ -172,7 +182,7 @@ export function Header() {
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[#25D366] transition-colors hover:bg-[#25D366]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-[#25D366] transition-colors hover:bg-[#25D366]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]"
               aria-label={`WhatsApp de ${nombreComercio}`}
             >
               <WhatsAppIcon className="size-5" aria-hidden />
@@ -203,12 +213,14 @@ export function Header() {
 
           {!searchOpen ? (
             showAccount && authUser ? (
-              <AccountMenu user={authUser} />
+              <div className="shrink-0">
+                <AccountMenu user={authUser} />
+              </div>
             ) : (
               <button
                 type="button"
                 onClick={openLoginDrawer}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label="Ingresar"
               >
                 <User className="size-5 shrink-0" aria-hidden />
@@ -220,7 +232,7 @@ export function Header() {
           <button
             type="button"
             onClick={toggleCart}
-            className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="relative inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label={`Abrir carrito, ${itemCount} ${itemCount === 1 ? "artículo" : "artículos"}`}
           >
             <ShoppingBag className="size-6" />

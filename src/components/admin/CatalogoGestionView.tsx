@@ -1,6 +1,18 @@
 "use client";
 
-import { Check, ChevronDown, ChevronRight, ImageIcon, Pencil, Trash2, X } from "lucide-react";
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ImageIcon,
+  ImageOff,
+  ImagePlus,
+  Loader2,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { AlertDialog } from "@/components/admin/AlertDialog";
 import { AdminSwitch } from "@/components/admin/ui";
@@ -8,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { adminCardClass, adminFieldClass, adminTableHeadClass, adminTableRowClass } from "@/lib/adminUi";
 import { getCloudinaryUploadConfig, uploadCloudinaryImage } from "@/lib/cloudinary";
+import { cn } from "@/lib/cn";
 import {
   createAdminCategoria,
   createAdminMarca,
@@ -119,7 +132,59 @@ function CategoriaThumb({ src }: { src: string | null }) {
   );
 }
 
+function SubcategoriaThumb({
+  nombre,
+  imageUrl,
+  uploading,
+  disabled = false,
+  onPick,
+}: {
+  nombre: string;
+  imageUrl: string | null;
+  uploading: boolean;
+  disabled?: boolean;
+  onPick: () => void;
+}) {
+  const [rota, setRota] = useState(false);
+  const visible = Boolean(imageUrl) && !rota && !uploading;
+
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      disabled={uploading || disabled}
+      title={visible ? "Cambiar imagen" : "Subir imagen"}
+      aria-label={
+        uploading ? `Subiendo imagen de ${nombre}` : `${visible ? "Cambiar" : "Subir"} imagen de ${nombre}`
+      }
+      className={cn(
+        "group relative size-10 shrink-0 overflow-hidden rounded-full disabled:cursor-wait",
+        visible ? "border border-slate-200" : "border border-dashed border-slate-300 bg-slate-100",
+      )}
+    >
+      {uploading ? (
+        <span className="flex size-full animate-pulse items-center justify-center bg-slate-200 text-slate-500">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+        </span>
+      ) : visible ? (
+        <>
+          <img src={imageUrl ?? ""} alt="" className="size-full object-cover" onError={() => setRota(true)} />
+          <span className="absolute inset-0 flex items-center justify-center bg-slate-900/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            <Camera className="size-4" aria-hidden />
+          </span>
+        </>
+      ) : (
+        <span className="flex size-full animate-pulse items-center justify-center text-slate-400 group-hover:animate-none group-hover:text-brand-orange">
+          <ImagePlus className="size-4" aria-hidden />
+        </span>
+      )}
+    </button>
+  );
+}
+
 function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uploadTarget = useRef<{ item: SubcategoriaItem; draft: boolean } | null>(null);
   const [items, setItems] = useState<SubcategoriaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [nombre, setNombre] = useState("");
@@ -127,9 +192,11 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [editingImage, setEditingImage] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [pending, setPending] = useState<SubcategoriaItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -175,20 +242,33 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
     }
   };
 
+  const startEdit = (item: SubcategoriaItem) => {
+    setError(null);
+    setEditingId(item.id);
+    setEditingName(item.nombre);
+    setEditingImage(item.imageUrl);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingName("");
+    setEditingImage(null);
+  };
+
   const saveEdit = async (item: SubcategoriaItem) => {
     const value = editingName.trim();
     if (value.length < 2) return;
     setSavingEdit(true);
     setError(null);
     try {
-      const actualizada = await updateSubcategoria(item.id, value);
+      const imageUrl = editingImage !== item.imageUrl ? editingImage : undefined;
+      const actualizada = await updateSubcategoria(item.id, value, imageUrl);
       setItems((current) =>
         current
           .map((row) => (row.id === item.id ? actualizada : row))
           .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
       );
-      setEditingId(null);
-      setEditingName("");
+      cancelEdit();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo actualizar la subcategoría.");
     } finally {
@@ -212,6 +292,46 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
     }
   };
 
+  const openUpload = (item: SubcategoriaItem) => {
+    if (uploadingId != null || savingEdit) return;
+    uploadTarget.current = { item, draft: editingId === item.id };
+    fileInput.current?.click();
+  };
+
+  const uploadImage = async (file: File) => {
+    const target = uploadTarget.current;
+    uploadTarget.current = null;
+    if (!target) return;
+    const { item, draft } = target;
+
+    setUploadingId(item.id);
+    setError(null);
+    const cloudinary = getCloudinaryUploadConfig();
+    if (!cloudinary) {
+      setUploadingId(null);
+      setError(
+        "Cloudinary no está configurado. Definí NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME y NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+      );
+      return;
+    }
+
+    try {
+      const dataUrl = await fileToUploadDataUrl(file);
+      const imageUrl = await uploadCloudinaryImage(dataUrl, cloudinary);
+      if (draft) {
+        setEditingImage(imageUrl);
+        return;
+      }
+      const actualizada = await updateSubcategoria(item.id, item.nombre, imageUrl);
+      setItems((current) => current.map((row) => (row.id === item.id ? actualizada : row)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo subir la imagen.");
+    } finally {
+      setUploadingId(null);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+
   return (
     <div className="border-l-2 border-slate-200 py-1 pl-4 sm:pl-6">
       <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Subcategorías</p>
@@ -224,14 +344,23 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
         <ul className="mt-2 space-y-1">
           {items.map((item) => {
             const editing = editingId === item.id;
+            const imageUrl = editing ? editingImage : item.imageUrl;
             return (
-              <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-white">
+              <li key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white">
+                <SubcategoriaThumb
+                  key={`${item.id}-${imageUrl ?? ""}`}
+                  nombre={item.nombre}
+                  imageUrl={imageUrl}
+                  uploading={uploadingId === item.id}
+                  disabled={uploadingId != null || savingEdit}
+                  onPick={() => openUpload(item)}
+                />
                 {editing ? (
                   <Input
                     value={editingName}
                     onChange={(event) => setEditingName(event.target.value)}
                     aria-label={`Nuevo nombre de ${item.nombre}`}
-                    className="min-h-9"
+                    className="min-h-9 min-w-0 flex-1"
                     autoFocus
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
@@ -241,16 +370,28 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
                     }}
                   />
                 ) : (
-                  <span className="truncate text-sm font-medium text-slate-800">{item.nombre}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{item.nombre}</span>
                 )}
                 <div className="flex shrink-0 items-center">
                   {editing ? (
                     <>
+                      {editingImage ? (
+                        <button
+                          type="button"
+                          className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                          aria-label={`Quitar imagen de ${item.nombre}`}
+                          title="Quitar imagen"
+                          disabled={savingEdit || uploadingId === item.id}
+                          onClick={() => setEditingImage(null)}
+                        >
+                          <ImageOff className="size-4" />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="inline-flex size-8 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                         aria-label="Guardar subcategoría"
-                        disabled={savingEdit || editingName.trim().length < 2}
+                        disabled={savingEdit || uploadingId === item.id || editingName.trim().length < 2}
                         onClick={() => void saveEdit(item)}
                       >
                         <Check className="size-4" />
@@ -259,11 +400,8 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
                         type="button"
                         className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
                         aria-label="Cancelar"
-                        disabled={savingEdit}
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditingName("");
-                        }}
+                        disabled={savingEdit || uploadingId === item.id}
+                        onClick={cancelEdit}
                       >
                         <X className="size-4" />
                       </button>
@@ -274,11 +412,8 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
                         type="button"
                         className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
                         aria-label={`Editar ${item.nombre}`}
-                        onClick={() => {
-                          setError(null);
-                          setEditingId(item.id);
-                          setEditingName(item.nombre);
-                        }}
+                        disabled={uploadingId === item.id}
+                        onClick={() => startEdit(item)}
                       >
                         <Pencil className="size-4" />
                       </button>
@@ -301,6 +436,18 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
           })}
         </ul>
       )}
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void uploadImage(file);
+        }}
+      />
       <div className="mt-3 flex max-w-xl flex-wrap gap-2">
         <Input
           value={nombre}

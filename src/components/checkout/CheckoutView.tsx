@@ -1,13 +1,15 @@
 "use client";
 
-import { FileText, ImageOff, MessageCircle, ShoppingBag } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileText, ImageOff, MessageCircle, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { MetodoPagoSelector, labelMetodoPago } from "@/components/checkout/MetodoPagoSelector";
 import { TipoEntregaSelector } from "@/components/checkout/TipoEntregaSelector";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PriceDisplay } from "@/components/product/PriceDisplay";
+import { cn } from "@/lib/cn";
 import { formatARS } from "@/lib/money";
 import { friendlyUserError } from "@/lib/errors";
 import { useHasMounted } from "@/lib/useHasMounted";
@@ -157,6 +159,79 @@ function FieldLabel({
   );
 }
 
+function ResumenItems({ items, className }: { items: CartItem[]; className?: string }) {
+  return (
+    <ul className={cn("flex flex-col gap-3", className)}>
+      {items.map((item) => (
+        <li key={item.varianteId} className="flex gap-3">
+          <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-surface">
+            {item.imagenUrl ? (
+              <img src={item.imagenUrl} alt="" className="size-full object-cover" />
+            ) : (
+              <div className="flex size-full items-center justify-center text-muted">
+                <ImageOff className="size-5" aria-hidden />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-main">{item.nombre}</p>
+            <p className="text-xs text-muted">
+              {item.varianteSku} · {item.cantidad} u.
+            </p>
+            <PriceDisplay
+              source={{
+                precioUnitario: item.precioUnitario * item.cantidad,
+                precioLista:
+                  item.precioLista && item.precioLista > item.precioUnitario
+                    ? item.precioLista * item.cantidad
+                    : undefined,
+                descuentoPorcentaje: item.descuentoPorcentaje,
+              }}
+              size="sm"
+              className="mt-0.5"
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ResumenTotales({
+  subtotal,
+  descuento,
+  codigoCupon,
+  total,
+}: {
+  subtotal: number;
+  descuento: number;
+  codigoCupon?: string;
+  total: number;
+}) {
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted">Subtotal</span>
+        <span className="font-semibold text-main">{formatARS(subtotal)}</span>
+      </div>
+      {descuento > 0 ? (
+        <div className="mt-1 flex items-center justify-between text-sm">
+          <span className="text-muted">Cupón {codigoCupon}</span>
+          <span className="font-medium text-emerald-700">-{formatARS(descuento)}</span>
+        </div>
+      ) : null}
+      <div className="mt-1 flex items-center justify-between text-sm">
+        <span className="text-muted">Flete</span>
+        <span className="text-xs text-muted">A coordinar</span>
+      </div>
+      <div className="mt-3 flex items-center justify-between">
+        <span className="font-semibold text-main">Total</span>
+        <span className="text-xl font-bold text-primary">{formatARS(total)}</span>
+      </div>
+    </div>
+  );
+}
+
 export function CheckoutView() {
   const hasMounted = useHasMounted();
   const items = useCartStore((state) => state.items);
@@ -178,6 +253,8 @@ export function CheckoutView() {
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [notas, setNotas] = useState("");
+  const [notasOpen, setNotasOpen] = useState(false);
+  const notasRef = useRef<HTMLTextAreaElement>(null);
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega | "">("");
   const [metodoPago, setMetodoPago] = useState<MetodoPagoCheckout | "">("");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -201,6 +278,8 @@ export function CheckoutView() {
       ? Math.round(subtotal * (porcentajeCupon / 100) * 100) / 100
       : Math.min(Number.isFinite(montoFijoCupon) ? montoFijoCupon : 0, subtotal);
   const totalConCupon = Math.max(subtotal - descuentoCupon, 0);
+  const cantidadProductos = visibleItems.reduce((total, item) => total + item.cantidad, 0);
+  const mostrarNotas = notasOpen || Boolean(notas.trim());
   const busy = confirming || downloadingPdf;
 
   useEffect(() => {
@@ -426,18 +505,54 @@ export function CheckoutView() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-8">
-        <h1 className="text-2xl font-bold text-main md:text-3xl">Finalizar Tu Pedido</h1>
-      <p className="mt-2 max-w-2xl text-sm text-muted">
+    <section className="mx-auto w-full max-w-7xl px-4 py-5 lg:py-8">
+      <Link
+        href="/productos"
+        className="mb-2 flex w-fit items-center gap-1 text-xs font-medium text-slate-600 hover:text-brand-orange sm:text-sm"
+      >
+        <ArrowLeft className="size-3.5 sm:size-4" aria-hidden />
+        Seguir comprando
+      </Link>
+      <h1 className="mb-3 text-xl font-bold text-main lg:mb-0 lg:text-3xl">Finalizar Tu Pedido</h1>
+      <p className="mt-2 hidden max-w-2xl text-sm text-muted lg:block">
         Completá tu nombre y teléfono para enviar tu pedido por WhatsApp o descargar tu presupuesto
         en PDF.
       </p>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="product-card p-5 md:p-6">
+      <details className="group product-card overflow-hidden lg:hidden">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-primary">
+            <ShoppingBag className="size-5 shrink-0" aria-hidden />
+            <span className="truncate group-open:hidden">
+              Ver resumen ({cantidadProductos} {cantidadProductos === 1 ? "producto" : "productos"})
+            </span>
+            <span className="hidden truncate group-open:inline">Ocultar resumen</span>
+            <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+          </span>
+          <span className="shrink-0 text-base font-bold text-slate-900">{formatARS(totalConCupon)}</span>
+        </summary>
+        <div className="border-t border-slate-100 px-4 pt-4 pb-4">
+          <ResumenItems items={visibleItems} />
+          <Link
+            href="/productos"
+            className="mt-3 inline-block py-1 text-xs font-semibold text-brand-orange hover:underline"
+          >
+            + Agregar más productos
+          </Link>
+          <ResumenTotales
+            subtotal={subtotal}
+            descuento={descuentoCupon}
+            codigoCupon={cuponAplicado?.codigo}
+            total={totalConCupon}
+          />
+        </div>
+      </details>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="product-card p-4 lg:p-6">
           <h2 className="text-lg font-semibold text-main">Datos de contacto</h2>
 
-          <div className="mt-5 grid gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-3 lg:mt-5 lg:grid-cols-2 lg:gap-4">
             <div>
               <FieldLabel htmlFor="checkout-nombre">Nombre completo</FieldLabel>
               <Input
@@ -479,25 +594,6 @@ export function CheckoutView() {
               ) : null}
             </div>
           </div>
-
-          <Button
-            variant="outline"
-            className="mt-4 w-full lg:hidden"
-            loading={downloadingPdf}
-            disabled={busy}
-            onClick={onDownloadPdf}
-          >
-            <FileText className="size-4" aria-hidden />
-            Descargar Presupuesto PDF
-          </Button>
-          {formError ? (
-            <p className="mt-2 rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent lg:hidden" role="alert">
-              {formError}
-            </p>
-          ) : null}
-          {pdfNotice ? (
-            <p className="mt-2 rounded-lg bg-primary/5 px-3 py-2 text-xs text-primary lg:hidden">{pdfNotice}</p>
-          ) : null}
 
           {hasMounted && !isAuthenticated ? (
             <div className="mt-4">
@@ -566,7 +662,7 @@ export function CheckoutView() {
             </div>
           ) : null}
 
-          <div className="mt-8">
+          <div className="mt-5 lg:mt-6">
             <TipoEntregaSelector
               value={tipoEntrega}
               onChange={(tipo) => {
@@ -576,7 +672,7 @@ export function CheckoutView() {
             />
           </div>
 
-          <div className="mt-8">
+          <div className="mt-5 lg:mt-6">
             <MetodoPagoSelector
               value={metodoPago}
               onChange={(metodo) => {
@@ -586,18 +682,34 @@ export function CheckoutView() {
             />
           </div>
 
-          <div className="mt-8">
+          {!mostrarNotas ? (
+            <button
+              type="button"
+              className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-2 hover:underline lg:hidden"
+              aria-expanded={false}
+              aria-controls="checkout-notas-campo"
+              onClick={() => {
+                flushSync(() => setNotasOpen(true));
+                notasRef.current?.focus();
+              }}
+            >
+              + Agregar nota o aclaración <span className="ml-1 font-normal text-muted">(opcional)</span>
+            </button>
+          ) : null}
+
+          <div id="checkout-notas-campo" className={cn("mt-5 lg:mt-6 lg:block", !mostrarNotas && "hidden")}>
             <FieldLabel htmlFor="checkout-notas" optional>
               Notas o aclaraciones
             </FieldLabel>
             <textarea
+              ref={notasRef}
               id="checkout-notas"
               value={notas}
               onChange={(event) => {
                 setNotas(event.target.value);
                 resetPresupuesto();
               }}
-              rows={4}
+              rows={3}
               maxLength={1800}
               placeholder="Horario preferido, referencia de la obra, etc."
               className="min-h-24 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm text-main placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
@@ -605,44 +717,16 @@ export function CheckoutView() {
           </div>
         </div>
 
-        <aside className="product-card h-fit p-5 lg:sticky lg:top-24">
-          <h2 className="text-lg font-semibold text-main">Resumen del pedido</h2>
+        <aside className="product-card h-fit self-start p-4 lg:sticky lg:top-24 lg:p-5">
+          <div className="hidden lg:block">
+            <h2 className="text-lg font-semibold text-main">Resumen del pedido</h2>
+            <ResumenItems
+              items={visibleItems}
+              className="mt-4 max-h-[min(18rem,calc(100vh_-_30rem))] min-h-28 overflow-y-auto pr-1"
+            />
+          </div>
 
-          <ul className="mt-4 flex flex-col gap-3">
-            {visibleItems.map((item) => (
-              <li key={item.varianteId} className="flex gap-3">
-                <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-surface">
-                  {item.imagenUrl ? (
-                    <img src={item.imagenUrl} alt="" className="size-full object-cover" />
-                  ) : (
-                    <div className="flex size-full items-center justify-center text-muted">
-                      <ImageOff className="size-5" aria-hidden />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-main">{item.nombre}</p>
-                  <p className="text-xs text-muted">
-                    {item.varianteSku} · {item.cantidad} u.
-                  </p>
-                  <PriceDisplay
-                    source={{
-                      precioUnitario: item.precioUnitario * item.cantidad,
-                      precioLista:
-                        item.precioLista && item.precioLista > item.precioUnitario
-                          ? item.precioLista * item.cantidad
-                          : undefined,
-                      descuentoPorcentaje: item.descuentoPorcentaje,
-                    }}
-                    size="sm"
-                    className="mt-0.5"
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-4 border-t border-slate-100 pt-4">
+          <div className="lg:mt-4 lg:border-t lg:border-slate-100 lg:pt-4">
             <p className="text-sm font-medium text-main">Tengo un código de descuento</p>
             {cuponAplicado ? (
               <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -687,25 +771,13 @@ export function CheckoutView() {
             ) : null}
           </div>
 
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted">Subtotal</span>
-              <span className="font-semibold text-main">{formatARS(subtotal)}</span>
-            </div>
-            {descuentoCupon > 0 ? (
-              <div className="mt-1 flex items-center justify-between text-sm">
-                <span className="text-muted">Cupón {cuponAplicado?.codigo}</span>
-                <span className="font-medium text-emerald-700">-{formatARS(descuentoCupon)}</span>
-              </div>
-            ) : null}
-            <div className="mt-1 flex items-center justify-between text-sm">
-              <span className="text-muted">Flete</span>
-              <span className="text-xs text-muted">A coordinar</span>
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="font-semibold text-main">Total</span>
-              <span className="text-xl font-bold text-primary">{formatARS(totalConCupon)}</span>
-            </div>
+          <div className="hidden lg:block">
+            <ResumenTotales
+              subtotal={subtotal}
+              descuento={descuentoCupon}
+              codigoCupon={cuponAplicado?.codigo}
+              total={totalConCupon}
+            />
           </div>
 
           {formError ? (

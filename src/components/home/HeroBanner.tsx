@@ -98,8 +98,8 @@ export function BenefitsBar() {
   }, [infoOpen]);
 
   return (
-    <section id="puntos-seguros" className="pb-20 md:pb-0">
-      <div className="border-y border-slate-100 bg-slate-50 py-6">
+    <section id="puntos-seguros">
+      <div className="border-t border-slate-100 bg-slate-50 pt-6 pb-6 lg:border-b">
         <div
           ref={scrollerRef}
           className="mx-auto flex max-w-7xl snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 scrollbar-none md:grid md:grid-cols-3 md:overflow-visible md:px-4"

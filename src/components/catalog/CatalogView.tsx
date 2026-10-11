@@ -11,7 +11,6 @@ import { ProductGrid } from "@/components/catalog/ProductGrid";
 import { Button } from "@/components/ui/Button";
 import {
   getActiveVariantes,
-  getProductoImagen,
   marcasDesdeProductos,
   productoCoincideCategoria,
   productoCoincideMarca,
@@ -63,20 +62,8 @@ function applyClientFilters(productos: Producto[], query: CatalogQueryState): Pr
 
 const PAGE_SIZE = 12;
 
-function imagenesPorSubcategoria(productos: Producto[]): Record<string, string> {
-  const imagenes: Record<string, string> = {};
-  for (const producto of productos) {
-    const clave = producto.subcategoria?.trim().toLowerCase();
-    if (!clave || imagenes[clave]) continue;
-    const imagen = getProductoImagen(producto, getActiveVariantes(producto)[0]);
-    if (imagen) imagenes[clave] = imagen;
-  }
-  return imagenes;
-}
-
 function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = true) {
   const [marcas, setMarcas] = useState<Marca[]>([]);
-  const [imagenesSubcategoria, setImagenesSubcategoria] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(enabled);
 
   useEffect(() => {
@@ -108,7 +95,6 @@ function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = tru
         if (cancelled) return;
         if (!tieneCategoria || !productosResp) {
           setMarcas(apiMarcas);
-          setImagenesSubcategoria({});
           return;
         }
 
@@ -117,7 +103,6 @@ function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = tru
         );
         const derivadas = marcasDesdeProductos(enCategoria);
         setMarcas(derivadas.length > 0 ? derivadas : apiMarcas);
-        setImagenesSubcategoria(imagenesPorSubcategoria(enCategoria));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -128,7 +113,7 @@ function useMarcasCatalogo(categoria: string, categoriaId: string, enabled = tru
     };
   }, [categoria, categoriaId, enabled]);
 
-  return { marcas, imagenesSubcategoria, loading };
+  return { marcas, loading };
 }
 
 export function CatalogFallback() {
@@ -392,7 +377,6 @@ export function CatalogView() {
         categorias={categorias}
         categoriaActiva={categoriaActiva}
         imagenesCategoria={imagenesCategoria}
-        imagenesSubcategoria={marcasCatalogo.imagenesSubcategoria}
         loading={categoriasLoading}
         onChange={(patch) => patchUrl(patch)}
       />

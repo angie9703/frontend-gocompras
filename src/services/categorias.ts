@@ -50,6 +50,33 @@ export async function getCategoriasDestacadas(): Promise<CategoriaDestacada[]> {
   });
 }
 
+export async function getSubcategoriasDeCategoria(
+  categoriaId: number,
+): Promise<Array<{ nombre: string; imageUrl: string | null }>> {
+  const { data } = await api.get<
+    ApiResponse<
+      Array<{
+        nombre?: string | null;
+        imageUrl?: string | null;
+        imagenUrl?: string | null;
+        imagen_url?: string | null;
+      }>
+    >
+  >("/subcategorias", { params: { categoriaId } });
+
+  return unwrapCategorias<{
+    nombre?: string | null;
+    imageUrl?: string | null;
+    imagenUrl?: string | null;
+    imagen_url?: string | null;
+  }>(data.data).flatMap((item) => {
+    const nombre = item.nombre?.trim();
+    if (!nombre) return [];
+    const imageUrl = item.imageUrl?.trim() || item.imagenUrl?.trim() || item.imagen_url?.trim() || null;
+    return [{ nombre, imageUrl }];
+  });
+}
+
 export async function getCategorias(): Promise<Categoria[]> {
   try {
     const { data } = await api.get<ApiResponse<Categoria[] | { items: Categoria[] }>>("/categorias");

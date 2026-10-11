@@ -50,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <CartDrawer />
             </StorefrontOnly>
             <LoginDrawer />
-            <main className="flex w-full min-w-0 max-w-full flex-1 flex-col overflow-x-hidden">{children}</main>
+            <main className="flex w-full min-w-0 max-w-full flex-1 flex-col overflow-x-clip">{children}</main>
             <StorefrontOnly>
               <Footer />
               <WhatsAppButton />

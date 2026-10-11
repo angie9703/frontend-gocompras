@@ -392,14 +392,32 @@ export type SubcategoriaItem = {
   nombre: string;
   categoriaId: number;
   categoria: string | null;
+  imageUrl: string | null;
 };
+
+type SubcategoriaPayload = SubcategoriaItem & {
+  imagenUrl?: string | null;
+  imagen_url?: string | null;
+  categoria_id?: number;
+};
+
+function normalizeSubcategoria(item: SubcategoriaPayload): SubcategoriaItem {
+  const imageUrl = item.imageUrl?.trim() || item.imagenUrl?.trim() || item.imagen_url?.trim() || "";
+  return {
+    id: item.id,
+    nombre: item.nombre,
+    categoriaId: item.categoriaId ?? item.categoria_id ?? 0,
+    categoria: item.categoria ?? null,
+    imageUrl: imageUrl || null,
+  };
+}
 
 export async function listSubcategorias(categoriaId?: number): Promise<SubcategoriaItem[]> {
   try {
-    const { data } = await api.get<ApiResponse<SubcategoriaItem[]>>("/subcategorias", {
+    const { data } = await api.get<ApiResponse<SubcategoriaPayload[]>>("/subcategorias", {
       params: categoriaId ? { categoriaId } : undefined,
     });
-    return unwrapList<SubcategoriaItem>(data.data);
+    return unwrapList<SubcategoriaPayload>(data.data).map(normalizeSubcategoria);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudieron cargar las subcategorías."));
   }
@@ -407,17 +425,24 @@ export async function listSubcategorias(categoriaId?: number): Promise<Subcatego
 
 export async function createSubcategoria(categoriaId: number, nombre: string): Promise<SubcategoriaItem> {
   try {
-    const { data } = await api.post<ApiResponse<SubcategoriaItem>>("/subcategorias", { categoriaId, nombre });
-    return data.data;
+    const { data } = await api.post<ApiResponse<SubcategoriaPayload>>("/subcategorias", { categoriaId, nombre });
+    return normalizeSubcategoria(data.data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo crear la subcategoría."));
   }
 }
 
-export async function updateSubcategoria(id: number, nombre: string): Promise<SubcategoriaItem> {
+export async function updateSubcategoria(
+  id: number,
+  nombre: string,
+  imageUrl?: string | null,
+): Promise<SubcategoriaItem> {
   try {
-    const { data } = await api.put<ApiResponse<SubcategoriaItem>>(`/subcategorias/${id}`, { nombre });
-    return data.data;
+    const { data } = await api.put<ApiResponse<SubcategoriaPayload>>(`/subcategorias/${id}`, {
+      nombre,
+      ...(imageUrl !== undefined ? { imageUrl } : {}),
+    });
+    return normalizeSubcategoria(data.data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo actualizar la subcategoría."));
   }

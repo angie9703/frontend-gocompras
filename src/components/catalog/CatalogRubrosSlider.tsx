@@ -1,8 +1,10 @@
 "use client";
 
 import { LayoutGrid, Package } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { CatalogQueryState } from "@/lib/catalogQuery";
 import { cn } from "@/lib/cn";
+import { getSubcategoriasDeCategoria } from "@/services/categorias";
 import type { Categoria } from "@/types";
 
 interface CatalogRubrosSliderProps {
@@ -10,7 +12,6 @@ interface CatalogRubrosSliderProps {
   categorias: Categoria[];
   categoriaActiva?: Categoria;
   imagenesCategoria: Record<number, string>;
-  imagenesSubcategoria: Record<string, string>;
   loading?: boolean;
   onChange: (patch: Partial<CatalogQueryState>) => void;
 }
@@ -19,9 +20,23 @@ interface Burbuja {
   key: string;
   label: string;
   imagen?: string;
+  cover?: boolean;
   todos?: boolean;
   active: boolean;
   onSelect: () => void;
+}
+
+function BurbujaImagen({ src, cover }: { src?: string; cover?: boolean }) {
+  const [rota, setRota] = useState(false);
+  if (!src || rota) return <Package className="size-5" aria-hidden />;
+  return (
+    <img
+      src={src}
+      alt=""
+      className={cover ? "size-full object-cover" : "max-h-full max-w-full object-contain mix-blend-multiply"}
+      onError={() => setRota(true)}
+    />
+  );
 }
 
 const RESET_FILTROS: Partial<CatalogQueryState> = {
@@ -40,12 +55,39 @@ export function CatalogRubrosSlider({
   categorias,
   categoriaActiva,
   imagenesCategoria,
-  imagenesSubcategoria,
   loading = false,
   onChange,
 }: CatalogRubrosSliderProps) {
   const subcategorias = categoriaActiva?.subcategorias ?? [];
   const modoSubcategorias = Boolean(categoriaActiva) && subcategorias.length > 0;
+  const [fotosSubcategoria, setFotosSubcategoria] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    const categoriaId = categoriaActiva?.id;
+    if (!categoriaId || categoriaId <= 0 || subcategorias.length === 0) {
+      setFotosSubcategoria({});
+      return;
+    }
+
+    let active = true;
+    setFotosSubcategoria({});
+    void getSubcategoriasDeCategoria(categoriaId)
+      .then((rows) => {
+        if (!active) return;
+        const fotos: Record<string, string | null> = {};
+        for (const row of rows) {
+          fotos[row.nombre.trim().toLowerCase()] = row.imageUrl;
+        }
+        setFotosSubcategoria(fotos);
+      })
+      .catch(() => {
+        if (active) setFotosSubcategoria({});
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [categoriaActiva?.id, subcategorias.length]);
 
   const imagenCategoria = (categoria: Categoria) =>
     categoria.imagenUrl?.trim() || imagenesCategoria[categoria.id];
@@ -79,13 +121,17 @@ export function CatalogRubrosSlider({
             active: !query.subcategoria,
             onSelect: () => seleccionarCategoria(categoriaActiva),
           },
-          ...subcategorias.map((nombre) => ({
-            key: `sub-${nombre}`,
-            label: nombre,
-            imagen: imagenesSubcategoria[nombre.trim().toLowerCase()],
-            active: query.subcategoria === nombre,
-            onSelect: () => onChange({ subcategoria: nombre }),
-          })),
+          ...subcategorias.map((nombre) => {
+            const imageUrl = fotosSubcategoria[nombre.trim().toLowerCase()] || undefined;
+            return {
+              key: `sub-${nombre}`,
+              label: nombre,
+              imagen: imageUrl,
+              cover: Boolean(imageUrl),
+              active: query.subcategoria === nombre,
+              onSelect: () => onChange({ subcategoria: nombre }),
+            };
+          }),
         ]
       : [
           todos,
@@ -124,21 +170,20 @@ export function CatalogRubrosSlider({
                 <span
                   className={cn(
                     "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full transition-all duration-200",
-                    !burbuja.active && "border border-slate-200/50 bg-slate-100/90 p-2 text-slate-600",
-                    burbuja.active &&
+                    burbuja.cover
+                      ? burbuja.active
+                        ? "scale-105 border-2 border-brand-orange shadow-sm"
+                        : "border border-slate-200"
+                      : !burbuja.active && "border border-slate-200/50 bg-slate-100/90 p-2 text-slate-600",
+                    !burbuja.cover &&
+                      burbuja.active &&
                       "scale-105 border-2 border-brand-orange bg-brand-orange/10 p-1.5 text-brand-orange shadow-sm",
                   )}
                 >
-                  {burbuja.imagen ? (
-                    <img
-                      src={burbuja.imagen}
-                      alt=""
-                      className="max-h-full max-w-full object-contain mix-blend-multiply"
-                    />
-                  ) : burbuja.todos ? (
+                  {burbuja.todos ? (
                     <LayoutGrid className="size-5" aria-hidden />
                   ) : (
-                    <Package className="size-5" aria-hidden />
+                    <BurbujaImagen key={burbuja.imagen ?? ""} src={burbuja.imagen} cover={burbuja.cover} />
                   )}
                 </span>
                 <span className="mt-1 line-clamp-2 h-8 w-full text-center text-[11px] leading-tight font-medium text-slate-600">
