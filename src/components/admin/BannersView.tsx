@@ -58,7 +58,9 @@ function compressImageFile(file: File): Promise<string> {
       }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(objectUrl);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      // JPEG no tiene canal alfa: las zonas transparentes de un PNG/WebP quedarían negras.
+      const formato = file.type === "image/jpeg" ? "image/jpeg" : "image/webp";
+      resolve(canvas.toDataURL(formato, 0.85));
     };
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl);

@@ -1,6 +1,7 @@
 "use client";
 
-import { FileSpreadsheet, ImageOff, Upload } from "lucide-react";
+import { CircleCheck, FileSpreadsheet, ImageOff, Upload } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import { AlertDialog } from "@/components/admin/AlertDialog";
 import { Button } from "@/components/ui/Button";
@@ -45,21 +46,29 @@ function formatFecha(value: string): string {
   return date.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
 }
 
+type ResultadoImportacion = { total: number; creados?: number; actualizados?: number };
+
+function cantidadProductos(cantidad: number): string {
+  return `${cantidad} ${cantidad === 1 ? "producto" : "productos"}`;
+}
+
 export function CargaMasivaView({
   compact = false,
   onImported,
   onReverted,
+  onClose,
 }: {
   compact?: boolean;
   onImported?: (resultado: { total: number; creados: number; actualizados: number }) => void | Promise<void>;
   onReverted?: () => void | Promise<void>;
+  onClose?: () => void;
 }) {
   const [tab, setTab] = useState<"carga" | "historial">("carga");
   const [rows, setRows] = useState<CargaMasivaItem[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<string | null>(null);
+  const [result, setResult] = useState<ResultadoImportacion | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -125,8 +134,13 @@ export function CargaMasivaView({
     setResult(null);
     try {
       const response = await importarCargaMasiva(rows, fileName ?? undefined);
-      const cantidad = response.total ?? rows.length;
-      setResult(`Se importaron ${cantidad} productos correctamente`);
+      setResult({
+        total: response.total ?? rows.length,
+        creados: response.creados,
+        actualizados: response.actualizados,
+      });
+      setRows([]);
+      setCurrentPage(1);
       await onImported?.(response);
     } catch (err) {
       setLoading(false);
@@ -134,6 +148,13 @@ export function CargaMasivaView({
       return;
     }
     setLoading(false);
+  };
+
+  const nuevaCarga = () => {
+    setResult(null);
+    setFileName(null);
+    setRows([]);
+    setError(null);
   };
 
   const confirmarReversion = async () => {
@@ -233,6 +254,51 @@ export function CargaMasivaView({
             </tbody>
           </table>
         </div>
+      ) : result ? (
+        <div
+          role="status"
+          className="flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-10 text-center"
+        >
+          <CircleCheck className="size-12 text-emerald-600" aria-hidden />
+          <h3 className="text-lg font-semibold text-emerald-900">¡Carga masiva exitosa!</h3>
+          <p className="max-w-md text-sm text-emerald-800">
+            Se importaron {cantidadProductos(result.total)} correctamente
+            {fileName ? (
+              <>
+                {" "}
+                desde <span className="font-semibold">{fileName}</span>
+              </>
+            ) : null}
+            .
+          </p>
+          {result.creados !== undefined || result.actualizados !== undefined ? (
+            <div className="flex flex-wrap justify-center gap-2 text-xs font-medium">
+              <span className="rounded-full bg-white px-3 py-1 text-emerald-700 ring-1 ring-emerald-200">
+                {result.creados ?? 0} nuevos
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-slate-600 ring-1 ring-slate-200">
+                {result.actualizados ?? 0} actualizados
+              </span>
+            </div>
+          ) : null}
+          <div className="mt-2 flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+            <Button variant="subtle" onClick={nuevaCarga}>
+              Cargar otro archivo
+            </Button>
+            {onClose ? (
+              <Button variant="dark" onClick={onClose}>
+                Cerrar y ver inventario
+              </Button>
+            ) : (
+              <Link
+                href="/admin/productos"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800"
+              >
+                Ver inventario
+              </Link>
+            )}
+          </div>
+        </div>
       ) : (
       <>
       <label
@@ -264,8 +330,6 @@ export function CargaMasivaView({
           {error}
         </p>
       ) : null}
-      {result && !onImported ? <p className="text-sm font-medium text-primary">{result}</p> : null}
-
       {rows.length > 0 ? (
         <>
           <div className={`${adminCardClass} overflow-x-auto`}>

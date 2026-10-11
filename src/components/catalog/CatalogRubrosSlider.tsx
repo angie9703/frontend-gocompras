@@ -33,7 +33,7 @@ function BurbujaImagen({ src, cover }: { src?: string; cover?: boolean }) {
     <img
       src={src}
       alt=""
-      className={cover ? "size-full object-cover" : "max-h-full max-w-full object-contain mix-blend-multiply"}
+      className={cover ? "size-full object-cover" : "size-full object-contain"}
       onError={() => setRota(true)}
     />
   );
@@ -149,7 +149,7 @@ export function CatalogRubrosSlider({
       aria-label={modoSubcategorias ? `Subcategorías de ${categoriaActiva?.nombre}` : "Rubros"}
       className="-mx-4 block px-3 lg:hidden"
     >
-      <div className="mb-3 flex snap-x gap-3 overflow-x-auto px-1 py-2 scrollbar-none">
+      <div className="mb-3 flex snap-x gap-3 overflow-x-auto px-2 py-2 scrollbar-none">
         {loading
           ? Array.from({ length: 6 }, (_, index) => (
               <div key={index} className="flex w-16 shrink-0 flex-col items-center">
@@ -169,15 +169,9 @@ export function CatalogRubrosSlider({
               >
                 <span
                   className={cn(
-                    "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full transition-all duration-200",
-                    burbuja.cover
-                      ? burbuja.active
-                        ? "scale-105 border-2 border-brand-orange shadow-sm"
-                        : "border border-slate-200"
-                      : !burbuja.active && "border border-slate-200/50 bg-slate-100/90 p-2 text-slate-600",
-                    !burbuja.cover &&
-                      burbuja.active &&
-                      "scale-105 border-2 border-brand-orange bg-brand-orange/10 p-1.5 text-brand-orange shadow-sm",
+                    "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-pink-100 bg-linear-to-br from-pink-300 via-rose-400 to-pink-50 text-rose-700 ring-brand-orange transition-all duration-200",
+                    !burbuja.cover && "p-2",
+                    burbuja.active ? "scale-105 shadow-md ring-[3px] ring-offset-2 ring-offset-white" : "ring-2",
                   )}
                 >
                   {burbuja.todos ? (

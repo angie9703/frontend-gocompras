@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, ImageOff, MoreVertical, Package, PackagePlus, Pencil, Star, Trash2, Upload } from "lucide-react";
+import { Boxes, ImageOff, MoreVertical, Package, PackagePlus, Pencil, Star, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertDialog } from "@/components/admin/AlertDialog";
 import { CargaMasivaView } from "@/components/admin/CargaMasivaView";
@@ -175,6 +175,7 @@ export function ProductosView() {
   const [editing, setEditing] = useState<Producto | null>(null);
   const [editingSku, setEditingSku] = useState<string | null>(null);
   const [cargaOpen, setCargaOpen] = useState(false);
+  const cargaConCambiosRef = useRef(false);
   const [stockTarget, setStockTarget] = useState<InventarioFila | null>(null);
   const [stockValue, setStockValue] = useState("");
   const [savingStock, setSavingStock] = useState(false);
@@ -450,6 +451,18 @@ export function ProductosView() {
     const timeout = window.setTimeout(() => setToast(null), 3500);
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  const closeCarga = () => {
+    setCargaOpen(false);
+    if (!cargaConCambiosRef.current) return;
+    cargaConCambiosRef.current = false;
+    setLoading(true);
+    setError(null);
+    void reload()
+      .then(() => getAdminCategorias().then(setCategorias))
+      .catch((err) => setError(err instanceof Error ? err.message : "No se pudieron cargar los productos."))
+      .finally(() => setLoading(false));
+  };
 
   const requestDelete = (productoId: number, nombre: string) => {
     setDeleteError(null);
@@ -1091,7 +1104,7 @@ export function ProductosView() {
             type="button"
             className="absolute inset-0 bg-slate-950/40"
             aria-label="Cerrar carga masiva"
-            onClick={() => setCargaOpen(false)}
+            onClick={closeCarga}
           />
           <div
             role="dialog"
@@ -1103,22 +1116,24 @@ export function ProductosView() {
               <h3 id={cargaTitleId} className="text-lg font-semibold text-slate-900">
                 Carga masiva
               </h3>
-              <Button variant="ghost" className="min-h-9 px-3 text-xs" onClick={() => setCargaOpen(false)}>
-                Cerrar
-              </Button>
+              <button
+                type="button"
+                className="inline-flex size-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar carga masiva"
+                onClick={closeCarga}
+              >
+                <X className="size-5" aria-hidden />
+              </button>
             </div>
             <CargaMasivaView
               compact
-              onImported={async (resultado) => {
-                setCargaOpen(false);
-                setToast(`Se importaron ${resultado.total} productos correctamente`);
-                await reload();
-                void getAdminCategorias().then(setCategorias);
+              onClose={closeCarga}
+              onImported={() => {
+                cargaConCambiosRef.current = true;
               }}
-              onReverted={async () => {
+              onReverted={() => {
+                cargaConCambiosRef.current = true;
                 setToast("Importación deshecha.");
-                await reload();
-                void getAdminCategorias().then(setCategorias);
               }}
             />
           </div>
