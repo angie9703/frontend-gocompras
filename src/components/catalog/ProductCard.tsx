@@ -52,8 +52,6 @@ export function ProductCard({ producto, compact = false }: ProductCardProps) {
     openCart();
   };
 
-  console.log("Variante actual:", selectedVariant);
-
   return (
     <article className="product-card flex h-full flex-col justify-between p-3 sm:p-4">
       <div className="flex flex-1 flex-col">

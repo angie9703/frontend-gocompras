@@ -14,12 +14,17 @@ export function getActiveVariantes(producto: Producto): Variante[] {
     ];
   }
   const activas = producto.variantes.filter((variante) => variante.activo !== false);
-  return activas.length > 0 ? activas : producto.variantes;
+  const lista = activas.length > 0 ? activas : producto.variantes;
+  return [...lista].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
 }
 
 export function getDefaultVariante(producto: Producto): Variante | undefined {
   const activas = getActiveVariantes(producto);
   if (activas.length === 0) return undefined;
+
+  // En un grupo, la portada es la variante de menor `orden` (la del CSV),
+  // aunque no sea la más barata ni tenga stock.
+  if (producto.grupoId?.trim()) return activas[0];
 
   const conStock = activas.filter((variante) => variante.stockDisponible > 0);
   const pool = conStock.length > 0 ? conStock : activas;

@@ -77,6 +77,7 @@ export interface Variante {
   stockReservado: number;
   stockDisponible: number;
   imagenUrl: string | null;
+  orden?: number;
   activo?: boolean;
 }
 
