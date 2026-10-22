@@ -1,12 +1,13 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { ImagePlus, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AlertDialog } from "@/components/admin/AlertDialog";
 import { AdminSwitch } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { adminCardClass, adminFieldClass, adminTableHeadClass, adminTableRowClass } from "@/lib/adminUi";
+import { cn } from "@/lib/cn";
 import { getCloudinaryUploadConfig, uploadCloudinaryImage } from "@/lib/cloudinary";
 import {
   createAdminBanner,
@@ -82,25 +83,158 @@ function enlaceValido(value: string): boolean {
   return href.startsWith("/") || href.startsWith("http://") || href.startsWith("https://");
 }
 
+type ImagenOrigen = "upload" | "url";
+
+function urlImagenManualValida(value: string): boolean {
+  const href = value.trim();
+  if (!href || href.length > 500) return false;
+  try {
+    const url = new URL(href);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function BannerImagenCampo({
+  nombre,
+  hint,
+  origen,
+  imageUrl,
+  uploading,
+  disabled,
+  onOrigenChange,
+  onImageUrlChange,
+  onFile,
+}: {
+  nombre: string;
+  hint: string;
+  origen: ImagenOrigen;
+  imageUrl: string;
+  uploading: boolean;
+  disabled: boolean;
+  onOrigenChange: (origen: ImagenOrigen) => void;
+  onImageUrlChange: (value: string) => void;
+  onFile: (file: File) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const preview = imageUrl.trim();
+  const urlInvalida = origen === "url" && preview.length > 0 && !urlImagenManualValida(preview);
+  const bloqueado = disabled || uploading;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-semibold text-slate-800">{nombre}</p>
+      <div role="tablist" aria-label={`Imagen de ${nombre}`} className="inline-flex rounded-lg bg-slate-100 p-0.5">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={origen === "upload"}
+          disabled={bloqueado}
+          onClick={() => onOrigenChange("upload")}
+          className={cn(
+            "rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+            origen === "upload" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+          )}
+        >
+          Subir archivo
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={origen === "url"}
+          disabled={bloqueado}
+          onClick={() => onOrigenChange("url")}
+          className={cn(
+            "rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+            origen === "url" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+          )}
+        >
+          Pegar URL
+        </button>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) onFile(file);
+        }}
+      />
+
+      {origen === "upload" ? (
+        <button
+          type="button"
+          disabled={bloqueado}
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            if (bloqueado) return;
+            const file = event.dataTransfer.files?.[0];
+            if (file) onFile(file);
+          }}
+          className="flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs text-slate-500 transition-colors hover:border-brand-orange hover:text-brand-orange disabled:cursor-wait disabled:opacity-60"
+        >
+          {uploading ? <Loader2 className="mb-1 size-4 animate-spin" aria-hidden /> : <ImagePlus className="mb-1 size-4" aria-hidden />}
+          {uploading ? "Subiendo imagen..." : "Arrastrá una imagen o hacé clic para subirla"}
+        </button>
+      ) : (
+        <div>
+          <Input
+            type="text"
+            value={imageUrl}
+            disabled={bloqueado}
+            placeholder="https://res.cloudinary.com/..."
+            aria-label={`URL de ${nombre}`}
+            aria-invalid={urlInvalida}
+            className="min-h-9"
+            onChange={(event) => onImageUrlChange(event.target.value)}
+          />
+          {urlInvalida ? (
+            <p className="mt-1 text-xs font-medium text-accent">
+              {preview.length > 500 ? "La URL no puede superar los 500 caracteres." : "Ingresá una URL http(s) válida."}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {preview ? (
+        <img src={preview} alt="" className="h-24 w-full rounded-lg bg-slate-100 object-cover" />
+      ) : (
+        <p className="text-xs text-slate-500">{hint}</p>
+      )}
+    </div>
+  );
+}
+
 export function BannersView() {
-  const desktopInput = useRef<HTMLInputElement>(null);
-  const mobileInput = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLElement>(null);
+  const editingIdRef = useRef<number | null>(null);
   const [items, setItems] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [titulo, setTitulo] = useState("");
   const [link, setLink] = useState("");
   const [orden, setOrden] = useState("0");
   const [activo, setActivo] = useState(true);
   const [imagenUrl, setImagenUrl] = useState("");
   const [imagenMobileUrl, setImagenMobileUrl] = useState("");
+  const [imagenOrigen, setImagenOrigen] = useState<ImagenOrigen>("upload");
+  const [imagenMobileOrigen, setImagenMobileOrigen] = useState<ImagenOrigen>("upload");
   const [uploading, setUploading] = useState<"desktop" | "mobile" | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [ordenDraft, setOrdenDraft] = useState<Record<number, string>>({});
   const [pending, setPending] = useState<Banner | null>(null);
   const [deleting, setDeleting] = useState(false);
+  editingIdRef.current = editingId;
 
   const load = async () => {
     const next = await listAdminBanners();
@@ -143,11 +277,55 @@ export function BannersView() {
     }
   };
 
-  const create = async () => {
+  const resetForm = () => {
+    setEditingId(null);
+    setTitulo("");
+    setLink("");
+    setOrden("0");
+    setActivo(true);
+    setImagenUrl("");
+    setImagenMobileUrl("");
+    setImagenOrigen("upload");
+    setImagenMobileOrigen("upload");
+    setError(null);
+  };
+
+  const startEdit = (banner: Banner) => {
+    setError(null);
+    setEditingId(banner.id);
+    setTitulo(banner.titulo || "");
+    setLink(bannerHref(banner));
+    setOrden(String(banner.orden ?? 0));
+    setActivo(banner.activo);
+    setImagenUrl(bannerDesktop(banner) ?? "");
+    setImagenMobileUrl(bannerMobile(banner) ?? "");
+    setImagenOrigen("upload");
+    setImagenMobileOrigen("upload");
+    setOrdenDraft((current) => {
+      if (!(banner.id in current)) return current;
+      const copy = { ...current };
+      delete copy[banner.id];
+      return copy;
+    });
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const save = async () => {
     const href = link.trim();
     const ordenNumero = Number(orden);
-    if (!imagenUrl) {
-      setError("Subí la imagen del banner antes de crearlo.");
+    const editing = editingId != null;
+    const desktop = imagenUrl.trim();
+    const mobile = imagenMobileUrl.trim();
+    if (!desktop) {
+      setError(editing ? "El banner necesita una imagen." : "Subí la imagen del banner antes de crearlo.");
+      return;
+    }
+    if (!urlImagenManualValida(desktop)) {
+      setError("La imagen de PC tiene que ser una URL http(s).");
+      return;
+    }
+    if (mobile && !urlImagenManualValida(mobile)) {
+      setError("La imagen de celular tiene que ser una URL http(s).");
       return;
     }
     if (!enlaceValido(href)) {
@@ -158,27 +336,54 @@ export function BannersView() {
       setError("El orden tiene que ser un número entero entre 0 y 9999.");
       return;
     }
+
+    const payload = {
+      titulo: titulo.trim() || "Banner",
+      imagenUrl: desktop,
+      imagenMobileUrl: mobile || null,
+      link_url: href || null,
+      orden: ordenNumero,
+      activo,
+    };
+
     setSaving(true);
     setError(null);
     try {
-      await createAdminBanner({
-        titulo: titulo.trim() || "Banner",
-        imagenUrl,
-        imagenMobileUrl: imagenMobileUrl || null,
-        link_url: href || null,
-        orden: ordenNumero,
-        activo,
-      });
-      setTitulo("");
-      setLink("");
-      setOrden("0");
-      setActivo(true);
-      setImagenUrl("");
-      setImagenMobileUrl("");
-      await load();
-      setToast("El banner se creó correctamente.");
+      if (editingId == null) {
+        await createAdminBanner(payload);
+        await load();
+        resetForm();
+        setToast("El banner se creó correctamente.");
+      } else {
+        const updated = await updateAdminBanner(editingId, payload);
+        setItems((current) =>
+          current
+            .map((item) => {
+              if (item.id !== editingId) return item;
+              return {
+                ...item,
+                ...updated,
+                titulo: updated.titulo || payload.titulo,
+                imagenUrl: updated.imagenUrl ?? payload.imagenUrl,
+                imagen_url: updated.imagen_url ?? updated.imagenUrl ?? payload.imagenUrl,
+                imagenMobileUrl: updated.imagenMobileUrl ?? payload.imagenMobileUrl,
+                imagen_mobile_url:
+                  updated.imagen_mobile_url ?? updated.imagenMobileUrl ?? payload.imagenMobileUrl,
+                link_url: updated.link_url ?? payload.link_url,
+                linkUrl: updated.linkUrl ?? payload.link_url,
+                linkDestino: updated.linkDestino ?? payload.link_url,
+                ctaHref: updated.ctaHref ?? payload.link_url,
+                orden: typeof updated.orden === "number" ? updated.orden : payload.orden,
+                activo: typeof updated.activo === "boolean" ? updated.activo : payload.activo,
+              };
+            })
+            .sort((a, b) => a.orden - b.orden || a.id - b.id),
+        );
+        resetForm();
+        setToast("El banner se actualizó correctamente.");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear el banner.");
+      setError(err instanceof Error ? err.message : editing ? "No se pudo guardar el banner." : "No se pudo crear el banner.");
     } finally {
       setSaving(false);
     }
@@ -186,6 +391,7 @@ export function BannersView() {
 
   const toggleActivo = (banner: Banner) => {
     const next = !banner.activo;
+    if (editingId === banner.id) setActivo(next);
     setItems((current) => current.map((item) => (item.id === banner.id ? { ...item, activo: next } : item)));
     setSavingId(banner.id);
     setError(null);
@@ -196,6 +402,7 @@ export function BannersView() {
       })
       .catch((err) => {
         setItems((current) => current.map((item) => (item.id === banner.id ? banner : item)));
+        if (editingIdRef.current === banner.id) setActivo(banner.activo);
         setError(err instanceof Error ? err.message : "No se pudo actualizar el banner.");
       })
       .finally(() => setSavingId(null));
@@ -208,6 +415,7 @@ export function BannersView() {
       return;
     }
     if (next === banner.orden) return;
+    if (editingId === banner.id) setOrden(String(next));
     setItems((current) =>
       current
         .map((item) => (item.id === banner.id ? { ...item, orden: next } : item))
@@ -230,6 +438,7 @@ export function BannersView() {
             .map((item) => (item.id === banner.id ? banner : item))
             .sort((a, b) => a.orden - b.orden || a.id - b.id),
         );
+        if (editingIdRef.current === banner.id) setOrden(String(banner.orden));
         setError(err instanceof Error ? err.message : "No se pudo actualizar el orden.");
       })
       .finally(() => setSavingId(null));
@@ -242,6 +451,7 @@ export function BannersView() {
     try {
       await deleteAdminBanner(pending.id);
       setItems((current) => current.filter((item) => item.id !== pending.id));
+      if (editingId === pending.id) resetForm();
       setPending(null);
       setToast("El banner se eliminó correctamente.");
     } catch (err) {
@@ -261,8 +471,21 @@ export function BannersView() {
         </p>
       </div>
 
-      <section className={`${adminCardClass} space-y-4 p-5`}>
-        <h3 className="font-semibold text-slate-900">Nuevo banner</h3>
+      <section ref={formRef} className={`${adminCardClass} scroll-mt-4 space-y-4 p-5`}>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-semibold text-slate-900">{editingId == null ? "Nuevo banner" : "Editar banner"}</h3>
+          {editingId != null ? (
+            <button
+              type="button"
+              className="inline-flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              aria-label="Cancelar edición"
+              disabled={saving}
+              onClick={resetForm}
+            >
+              <X className="size-4" />
+            </button>
+          ) : null}
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <label className={adminFieldClass}>
             Título
@@ -295,67 +518,46 @@ export function BannersView() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-800">Imagen</p>
-            <input
-              ref={desktopInput}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (file) void upload(file, "desktop");
-              }}
-            />
-            <Button
-              type="button"
-              variant="subtle"
-              loading={uploading === "desktop"}
-              disabled={uploading != null}
-              onClick={() => desktopInput.current?.click()}
-            >
-              Subir imagen
-            </Button>
-            {imagenUrl ? (
-              <img src={imagenUrl} alt="" className="h-24 w-full rounded-lg bg-slate-100 object-cover" />
-            ) : (
-              <p className="text-xs text-slate-500">La imagen se sube a Cloudinary y se usa en el carrusel.</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-800">Imagen para celular</p>
-            <input
-              ref={mobileInput}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (file) void upload(file, "mobile");
-              }}
-            />
-            <Button
-              type="button"
-              variant="subtle"
-              loading={uploading === "mobile"}
-              disabled={uploading != null}
-              onClick={() => mobileInput.current?.click()}
-            >
-              Subir imagen mobile
-            </Button>
-            {imagenMobileUrl ? (
-              <img src={imagenMobileUrl} alt="" className="h-24 w-full rounded-lg bg-slate-100 object-cover" />
-            ) : (
-              <p className="text-xs text-slate-500">Opcional. Si no hay, el celular usa la imagen principal.</p>
-            )}
-          </div>
+          <BannerImagenCampo
+            nombre="Imagen"
+            hint="La imagen se sube a Cloudinary, o podés pegar una URL, y se usa en el carrusel."
+            origen={imagenOrigen}
+            imageUrl={imagenUrl}
+            uploading={uploading === "desktop"}
+            disabled={saving || uploading != null}
+            onOrigenChange={setImagenOrigen}
+            onImageUrlChange={setImagenUrl}
+            onFile={(file) => void upload(file, "desktop")}
+          />
+          <BannerImagenCampo
+            nombre="Imagen para celular"
+            hint="Opcional. Si no hay, el celular usa la imagen principal."
+            origen={imagenMobileOrigen}
+            imageUrl={imagenMobileUrl}
+            uploading={uploading === "mobile"}
+            disabled={saving || uploading != null}
+            onOrigenChange={setImagenMobileOrigen}
+            onImageUrlChange={setImagenMobileUrl}
+            onFile={(file) => void upload(file, "mobile")}
+          />
         </div>
 
-        <Button variant="dark" loading={saving} disabled={saving || uploading != null || !imagenUrl} onClick={() => void create()}>
-          Crear banner
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="dark"
+            loading={saving}
+            disabled={saving || uploading != null || !imagenUrl.trim()}
+            onClick={() => void save()}
+          >
+            {editingId == null ? "Crear banner" : "Guardar cambios"}
+          </Button>
+          {editingId != null ? (
+            <Button variant="subtle" disabled={saving} onClick={resetForm}>
+              <X className="size-4" aria-hidden />
+              Cancelar
+            </Button>
+          ) : null}
+        </div>
       </section>
 
       {error ? <p className="text-sm font-medium text-accent">{error}</p> : null}
@@ -390,7 +592,7 @@ export function BannersView() {
                 const preview = bannerDesktop(banner) || bannerMobile(banner);
                 const ordenValue = ordenDraft[banner.id] ?? String(banner.orden);
                 return (
-                  <tr key={banner.id} className={adminTableRowClass}>
+                  <tr key={banner.id} className={cn(adminTableRowClass, editingId === banner.id && "bg-primary/5")}>
                     <td className="px-4 py-2.5">
                       {preview ? (
                         <img src={preview} alt="" className="h-14 w-24 rounded-md bg-slate-100 object-cover" />
@@ -430,17 +632,31 @@ export function BannersView() {
                       />
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <button
-                        type="button"
-                        className="inline-flex size-9 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50"
-                        aria-label={`Eliminar ${banner.titulo || "banner"}`}
-                        onClick={() => {
-                          setError(null);
-                          setPending(banner);
-                        }}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+                      <div className="inline-flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          className={cn(
+                            "inline-flex size-9 items-center justify-center rounded-lg hover:bg-slate-100",
+                            editingId === banner.id ? "bg-primary/10 text-primary" : "text-slate-500",
+                          )}
+                          aria-label={`Editar ${banner.titulo || "banner"}`}
+                          aria-pressed={editingId === banner.id}
+                          onClick={() => startEdit(banner)}
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex size-9 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50"
+                          aria-label={`Eliminar ${banner.titulo || "banner"}`}
+                          onClick={() => {
+                            setError(null);
+                            setPending(banner);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

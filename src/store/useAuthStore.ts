@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { AUTH_STORAGE_KEY, getAuthToken, setAuthToken } from "@/lib/authToken";
+import { registerSessionClear } from "@/lib/sessionExpiry";
 import { getProfile, login as loginRequest, register as registerRequest, updateProfile as updateProfileRequest } from "@/services/auth";
 import type { AuthUser, LoginCredentials, RegisterPayload, UpdateProfilePayload } from "@/types";
 
@@ -12,10 +13,12 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isLoginDrawerOpen: boolean;
+  sessionExpired: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<void>;
   logout: () => void;
+  expireSession: () => void;
   checkAuth: () => Promise<void>;
   openLoginDrawer: () => void;
   closeLoginDrawer: () => void;
@@ -28,6 +31,18 @@ function applySession(token: string, user: AuthUser) {
     user,
     isAuthenticated: true,
     isLoading: false,
+    sessionExpired: false,
+  } as const;
+}
+
+function clearedSession(sessionExpired: boolean) {
+  setAuthToken(null);
+  return {
+    token: null,
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    sessionExpired,
   } as const;
 }
 
@@ -39,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: true,
       isLoginDrawerOpen: false,
+      sessionExpired: false,
 
       openLoginDrawer: () => set({ isLoginDrawerOpen: true }),
       closeLoginDrawer: () => set({ isLoginDrawerOpen: false }),
@@ -59,25 +75,17 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        setAuthToken(null);
-        set({
-          token: null,
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-        });
+        set(clearedSession(false));
+      },
+
+      expireSession: () => {
+        set(clearedSession(true));
       },
 
       checkAuth: async () => {
         const token = get().token ?? getAuthToken();
         if (!token) {
-          setAuthToken(null);
-          set({
-            token: null,
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+          set(clearedSession(get().sessionExpired));
           return;
         }
 
@@ -91,15 +99,11 @@ export const useAuthStore = create<AuthState>()(
             user,
             isAuthenticated: true,
             isLoading: false,
+            sessionExpired: false,
           });
         } catch {
-          setAuthToken(null);
-          set({
-            token: null,
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+          const sessionExpired = get().sessionExpired;
+          set(clearedSession(sessionExpired));
         }
       },
     }),
@@ -120,3 +124,7 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+registerSessionClear(() => {
+  useAuthStore.getState().expireSession();
+});

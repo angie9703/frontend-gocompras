@@ -35,11 +35,13 @@ export function Header() {
   const totalItems = useCartStore((state) => state.getTotalItems());
   const authUser = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const sessionExpired = useAuthStore((state) => state.sessionExpired);
   const openLoginDrawer = useAuthStore((state) => state.openLoginDrawer);
   const config = useComercioConfig();
   const ajustes = useAjustes();
   const itemCount = hasMounted ? totalItems : 0;
   const showAccount = hasMounted && isAuthenticated && authUser;
+  const loginLabel = sessionExpired ? "Iniciar sesión" : "Ingresar";
   const cleanPhone = ajustes?.whatsapp ? ajustes.whatsapp.replace(/\D/g, "") : "";
   const whatsappUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : "";
   const nombreComercio = config.nombreComercio;
@@ -217,15 +219,22 @@ export function Header() {
                 <AccountMenu user={authUser} />
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={openLoginDrawer}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                aria-label="Ingresar"
-              >
-                <User className="size-5 shrink-0" aria-hidden />
-                <span className="hidden text-sm font-semibold sm:inline">Ingresar</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={openLoginDrawer}
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label={loginLabel}
+                >
+                  <User className="size-5 shrink-0" aria-hidden />
+                  <span className="hidden text-sm font-semibold sm:inline">{loginLabel}</span>
+                </button>
+                {sessionExpired ? (
+                  <span className="sr-only" role="status">
+                    Tu sesión expiró.
+                  </span>
+                ) : null}
+              </>
             )
           ) : null}
 

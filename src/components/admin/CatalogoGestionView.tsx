@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Camera,
   Check,
   ChevronDown,
   ChevronRight,
@@ -73,6 +72,38 @@ function enlaceImagenValido(value: string): boolean {
   return href.startsWith("http://") || href.startsWith("https://");
 }
 
+type ImagenOrigen = "upload" | "url";
+
+type SubcategoriaUploadTarget = { mode: "edit"; item: SubcategoriaItem } | { mode: "create" };
+
+function urlImagenManualValida(value: string): boolean {
+  const href = value.trim();
+  if (!href || href.length > 500) return false;
+  try {
+    const url = new URL(href);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function mensajeUrlManualInvalida(value: string): string {
+  if (value.trim().length > 500) return "La URL no puede superar los 500 caracteres.";
+  return "Pegá una URL http(s) válida para la imagen.";
+}
+
+function resolverImagenSubcategoria(
+  origen: ImagenOrigen,
+  value: string,
+): { ok: true; imageUrl: string | null } | { ok: false } {
+  const url = value.trim();
+  if (origen === "url") {
+    if (!urlImagenManualValida(url)) return { ok: false };
+    return { ok: true, imageUrl: url };
+  }
+  return { ok: true, imageUrl: url || null };
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -138,30 +169,23 @@ function SubcategoriaThumb({
   nombre,
   imageUrl,
   uploading,
-  disabled = false,
-  onPick,
 }: {
   nombre: string;
   imageUrl: string | null;
   uploading: boolean;
-  disabled?: boolean;
-  onPick: () => void;
 }) {
   const [rota, setRota] = useState(false);
   const visible = Boolean(imageUrl) && !rota && !uploading;
 
   return (
-    <button
-      type="button"
-      onClick={onPick}
-      disabled={uploading || disabled}
-      title={visible ? "Cambiar imagen" : "Subir imagen"}
+    <span
+      role="img"
       aria-label={
-        uploading ? `Subiendo imagen de ${nombre}` : `${visible ? "Cambiar" : "Subir"} imagen de ${nombre}`
+        uploading ? `Subiendo imagen de ${nombre}` : visible ? `Imagen de ${nombre}` : `${nombre} sin imagen`
       }
       className={cn(
-        "group relative size-10 shrink-0 overflow-hidden rounded-full disabled:cursor-wait",
-        visible ? "border border-slate-200" : "border border-dashed border-slate-300 bg-slate-100",
+        "relative size-10 shrink-0 overflow-hidden rounded-full",
+        visible ? "border border-slate-200" : "border border-slate-200 bg-slate-100",
       )}
     >
       {uploading ? (
@@ -169,24 +193,132 @@ function SubcategoriaThumb({
           <Loader2 className="size-4 animate-spin" aria-hidden />
         </span>
       ) : visible ? (
-        <>
-          <img src={imageUrl ?? ""} alt="" className="size-full object-cover" onError={() => setRota(true)} />
-          <span className="absolute inset-0 flex items-center justify-center bg-slate-900/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-            <Camera className="size-4" aria-hidden />
-          </span>
-        </>
+        <img src={imageUrl ?? ""} alt="" className="size-full object-cover" onError={() => setRota(true)} />
       ) : (
-        <span className="flex size-full animate-pulse items-center justify-center text-slate-400 group-hover:animate-none group-hover:text-brand-orange">
-          <ImagePlus className="size-4" aria-hidden />
+        <span className="flex size-full items-center justify-center text-slate-400">
+          <ImageIcon className="size-4" aria-hidden />
         </span>
       )}
-    </button>
+    </span>
+  );
+}
+
+function SubcategoriaImagenCampo({
+  nombre,
+  origen,
+  imageUrl,
+  uploading,
+  disabled = false,
+  mostrarPreview = false,
+  onOrigenChange,
+  onImageUrlChange,
+  onPickFile,
+  onFile,
+}: {
+  nombre: string;
+  origen: ImagenOrigen;
+  imageUrl: string;
+  uploading: boolean;
+  disabled?: boolean;
+  mostrarPreview?: boolean;
+  onOrigenChange: (origen: ImagenOrigen) => void;
+  onImageUrlChange: (value: string) => void;
+  onPickFile: () => void;
+  onFile: (file: File) => void;
+}) {
+  const preview = imageUrl.trim() || null;
+  const urlInvalida = origen === "url" && preview != null && !urlImagenManualValida(preview);
+
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {mostrarPreview ? (
+          <SubcategoriaThumb
+            key={preview ?? "vacia"}
+            nombre={nombre}
+            imageUrl={preview}
+            uploading={uploading}
+          />
+        ) : null}
+        <div role="tablist" aria-label={`Imagen de ${nombre}`} className="inline-flex rounded-lg bg-slate-100 p-0.5">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={origen === "upload"}
+            disabled={disabled || uploading}
+            onClick={() => onOrigenChange("upload")}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+              origen === "upload" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+            )}
+          >
+            Subir archivo
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={origen === "url"}
+            disabled={disabled || uploading}
+            onClick={() => onOrigenChange("url")}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+              origen === "url" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+            )}
+          >
+            Pegar URL
+          </button>
+        </div>
+      </div>
+
+      {origen === "upload" ? (
+        <button
+          type="button"
+          disabled={disabled || uploading}
+          onClick={onPickFile}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            if (disabled || uploading) return;
+            const file = event.dataTransfer.files?.[0];
+            if (file) onFile(file);
+          }}
+          className="mt-2 flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs text-slate-500 transition-colors hover:border-brand-orange hover:text-brand-orange disabled:cursor-wait disabled:opacity-60"
+        >
+          {uploading ? (
+            <Loader2 className="mb-1 size-4 animate-spin" aria-hidden />
+          ) : (
+            <ImagePlus className="mb-1 size-4" aria-hidden />
+          )}
+          {uploading ? "Subiendo imagen..." : "Arrastrá una imagen o hacé clic para subirla"}
+        </button>
+      ) : (
+        <div className="mt-2">
+          <Input
+            type="text"
+            value={imageUrl}
+            disabled={disabled || uploading}
+            placeholder="https://res.cloudinary.com/..."
+            aria-label={`URL de imagen de ${nombre}`}
+            aria-invalid={urlInvalida}
+            className="min-h-9"
+            onChange={(event) => onImageUrlChange(event.target.value)}
+          />
+          {urlInvalida ? (
+            <p className="mt-1 text-xs font-medium text-accent">
+              {preview.length > 500
+                ? "La URL no puede superar los 500 caracteres."
+                : "Ingresá una URL http(s) válida."}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </div>
   );
 }
 
 function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const uploadTarget = useRef<{ item: SubcategoriaItem; draft: boolean } | null>(null);
+  const uploadTarget = useRef<SubcategoriaUploadTarget | null>(null);
   const [items, setItems] = useState<SubcategoriaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [nombre, setNombre] = useState("");
@@ -194,11 +326,17 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [editingImage, setEditingImage] = useState<string | null>(null);
+  const [editingImage, setEditingImage] = useState("");
+  const [editingOrigen, setEditingOrigen] = useState<ImagenOrigen>("upload");
   const [savingEdit, setSavingEdit] = useState(false);
   const [pending, setPending] = useState<SubcategoriaItem | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [uploadingId, setUploadingId] = useState<number | null>(null);
+  const [uploadingId, setUploadingId] = useState<number | "nueva" | null>(null);
+  const [createImageUrl, setCreateImageUrl] = useState("");
+  const [createOrigen, setCreateOrigen] = useState<ImagenOrigen>("upload");
+  const [imagenCreacionAbierta, setImagenCreacionAbierta] = useState(false);
+  const mostrarImagenCreacion =
+    imagenCreacionAbierta || nombre.trim().length > 0 || createImageUrl.trim().length > 0 || uploadingId === "nueva";
 
   useEffect(() => {
     let active = true;
@@ -227,16 +365,24 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
   const create = async () => {
     const value = nombre.trim();
     if (value.length < 2) return;
+    const imagen = resolverImagenSubcategoria(createOrigen, createImageUrl);
+    if (!imagen.ok) {
+      setError(mensajeUrlManualInvalida(createImageUrl));
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const creada = await createSubcategoria(categoriaId, value);
+      const creada = await createSubcategoria(categoriaId, value, imagen.imageUrl);
       setItems((current) =>
         [...current.filter((item) => item.id !== creada.id), creada].sort((a, b) =>
           a.nombre.localeCompare(b.nombre, "es"),
         ),
       );
       setNombre("");
+      setCreateImageUrl("");
+      setCreateOrigen("upload");
+      setImagenCreacionAbierta(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la subcategoría.");
     } finally {
@@ -248,23 +394,29 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
     setError(null);
     setEditingId(item.id);
     setEditingName(item.nombre);
-    setEditingImage(item.imageUrl);
+    setEditingImage(item.imageUrl ?? "");
+    setEditingOrigen("upload");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditingName("");
-    setEditingImage(null);
+    setEditingImage("");
+    setEditingOrigen("upload");
   };
 
   const saveEdit = async (item: SubcategoriaItem) => {
     const value = editingName.trim();
     if (value.length < 2) return;
+    const imagen = resolverImagenSubcategoria(editingOrigen, editingImage);
+    if (!imagen.ok) {
+      setError(mensajeUrlManualInvalida(editingImage));
+      return;
+    }
     setSavingEdit(true);
     setError(null);
     try {
-      const imageUrl = editingImage !== item.imageUrl ? editingImage : undefined;
-      const actualizada = await updateSubcategoria(item.id, value, imageUrl);
+      const actualizada = await updateSubcategoria(item.id, value, imagen.imageUrl);
       setItems((current) =>
         current
           .map((row) => (row.id === item.id ? actualizada : row))
@@ -294,19 +446,15 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
     }
   };
 
-  const openUpload = (item: SubcategoriaItem) => {
-    if (uploadingId != null || savingEdit) return;
-    uploadTarget.current = { item, draft: editingId === item.id };
+  const openUpload = (target: SubcategoriaUploadTarget) => {
+    if (uploadingId != null || savingEdit || saving) return;
+    uploadTarget.current = target;
     fileInput.current?.click();
   };
 
-  const uploadImage = async (file: File) => {
-    const target = uploadTarget.current;
+  const subirImagen = async (file: File, target: SubcategoriaUploadTarget) => {
     uploadTarget.current = null;
-    if (!target) return;
-    const { item, draft } = target;
-
-    setUploadingId(item.id);
+    setUploadingId(target.mode === "create" ? "nueva" : target.item.id);
     setError(null);
     const cloudinary = getCloudinaryUploadConfig();
     if (!cloudinary) {
@@ -320,12 +468,13 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
     try {
       const dataUrl = await fileToUploadDataUrl(file);
       const imageUrl = await uploadCloudinaryImage(dataUrl, cloudinary);
-      if (draft) {
-        setEditingImage(imageUrl);
+      if (target.mode === "create") {
+        setCreateImageUrl(imageUrl);
+        setCreateOrigen("upload");
         return;
       }
-      const actualizada = await updateSubcategoria(item.id, item.nombre, imageUrl);
-      setItems((current) => current.map((row) => (row.id === item.id ? actualizada : row)));
+      setEditingImage(imageUrl);
+      setEditingOrigen("upload");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo subir la imagen.");
     } finally {
@@ -346,16 +495,15 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
         <ul className="mt-2 space-y-1">
           {items.map((item) => {
             const editing = editingId === item.id;
-            const imageUrl = editing ? editingImage : item.imageUrl;
+            const imageUrl = (editing ? editingImage : (item.imageUrl ?? "")).trim() || null;
             return (
-              <li key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white">
+              <li key={item.id} className="rounded-lg px-2 py-1 hover:bg-white">
+                <div className="flex items-center gap-2">
                 <SubcategoriaThumb
                   key={`${item.id}-${imageUrl ?? ""}`}
                   nombre={item.nombre}
                   imageUrl={imageUrl}
                   uploading={uploadingId === item.id}
-                  disabled={uploadingId != null || savingEdit}
-                  onPick={() => openUpload(item)}
                 />
                 {editing ? (
                   <Input
@@ -377,14 +525,17 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
                 <div className="flex shrink-0 items-center">
                   {editing ? (
                     <>
-                      {editingImage ? (
+                      {editingImage.trim() ? (
                         <button
                           type="button"
                           className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50"
                           aria-label={`Quitar imagen de ${item.nombre}`}
                           title="Quitar imagen"
                           disabled={savingEdit || uploadingId === item.id}
-                          onClick={() => setEditingImage(null)}
+                          onClick={() => {
+                            setEditingImage("");
+                            setEditingOrigen("upload");
+                          }}
                         >
                           <ImageOff className="size-4" />
                         </button>
@@ -433,6 +584,22 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
                     </>
                   )}
                 </div>
+                </div>
+                {editing ? (
+                  <div className="ml-12">
+                    <SubcategoriaImagenCampo
+                      nombre={item.nombre}
+                      origen={editingOrigen}
+                      imageUrl={editingImage}
+                      uploading={uploadingId === item.id}
+                      disabled={savingEdit}
+                      onOrigenChange={setEditingOrigen}
+                      onImageUrlChange={setEditingImage}
+                      onPickFile={() => openUpload({ mode: "edit", item })}
+                      onFile={(file) => void subirImagen(file, { mode: "edit", item })}
+                    />
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -447,33 +614,62 @@ function SubcategoriasPanel({ categoriaId }: { categoriaId: number }) {
         aria-hidden
         onChange={(event) => {
           const file = event.target.files?.[0];
-          if (file) void uploadImage(file);
+          const target = uploadTarget.current;
+          uploadTarget.current = null;
+          if (file && target) void subirImagen(file, target);
         }}
       />
-      <div className="mt-3 flex max-w-xl flex-wrap gap-2">
-        <Input
-          value={nombre}
-          onChange={(event) => setNombre(event.target.value)}
-          placeholder="Nueva subcategoría"
-          aria-label="Nombre de la subcategoría"
-          className="min-h-9"
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void create();
-            }
-          }}
-        />
-        <Button
-          variant="dark"
-          className="shrink-0 px-3! py-2! text-xs!"
-          onClick={() => void create()}
-          loading={saving}
-          disabled={nombre.trim().length < 2}
-        >
-          + Agregar subcategoría
-        </Button>
-      </div>
+      {editingId == null ? (
+        <div className="mt-3 max-w-xl">
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={nombre}
+              onChange={(event) => setNombre(event.target.value)}
+              placeholder="Nueva subcategoría"
+              aria-label="Nombre de la subcategoría"
+              className="min-h-9 min-w-0 flex-1"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void create();
+                }
+              }}
+            />
+            {mostrarImagenCreacion ? null : (
+              <Button
+                variant="subtle"
+                className="shrink-0 px-3! py-2! text-xs!"
+                onClick={() => setImagenCreacionAbierta(true)}
+              >
+                Imagen
+              </Button>
+            )}
+            <Button
+              variant="dark"
+              className="shrink-0 px-3! py-2! text-xs!"
+              onClick={() => void create()}
+              loading={saving}
+              disabled={nombre.trim().length < 2 || uploadingId === "nueva"}
+            >
+              + Agregar subcategoría
+            </Button>
+          </div>
+          {mostrarImagenCreacion ? (
+            <SubcategoriaImagenCampo
+              nombre="nueva subcategoría"
+              origen={createOrigen}
+              imageUrl={createImageUrl}
+              uploading={uploadingId === "nueva"}
+              disabled={saving}
+              mostrarPreview
+              onOrigenChange={setCreateOrigen}
+              onImageUrlChange={setCreateImageUrl}
+              onPickFile={() => openUpload({ mode: "create" })}
+              onFile={(file) => void subirImagen(file, { mode: "create" })}
+            />
+          ) : null}
+        </div>
+      ) : null}
       {pending ? (
         <AlertDialog
           title="Eliminar subcategoría"

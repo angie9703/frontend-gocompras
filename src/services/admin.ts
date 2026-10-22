@@ -423,9 +423,17 @@ export async function listSubcategorias(categoriaId?: number): Promise<Subcatego
   }
 }
 
-export async function createSubcategoria(categoriaId: number, nombre: string): Promise<SubcategoriaItem> {
+export async function createSubcategoria(
+  categoriaId: number,
+  nombre: string,
+  imageUrl?: string | null,
+): Promise<SubcategoriaItem> {
   try {
-    const { data } = await api.post<ApiResponse<SubcategoriaPayload>>("/subcategorias", { categoriaId, nombre });
+    const { data } = await api.post<ApiResponse<SubcategoriaPayload>>("/subcategorias", {
+      categoriaId,
+      nombre,
+      ...(imageUrl ? { imageUrl } : {}),
+    });
     return normalizeSubcategoria(data.data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo crear la subcategoría."));
