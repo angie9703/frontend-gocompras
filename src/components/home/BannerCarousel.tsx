@@ -107,7 +107,7 @@ export function BannerCarousel() {
   if (loading) {
     return (
       <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
-        <div className="h-56 w-full animate-pulse rounded-2xl bg-slate-100 sm:h-72 md:h-[22rem]" aria-hidden />
+        <div className="aspect-[4/3] w-full animate-pulse rounded-2xl bg-slate-100 md:aspect-auto md:h-[22rem]" aria-hidden />
       </div>
     );
   }
@@ -147,7 +147,7 @@ export function BannerCarousel() {
       }}
     >
       <div
-        className="relative z-0 flex h-56 transition-transform duration-500 ease-out sm:h-72 md:h-[22rem]"
+        className="relative z-0 flex aspect-[4/3] w-full transition-transform duration-500 ease-out md:aspect-auto md:h-[22rem]"
         style={{ transform: `translateX(-${index * 100}%)` }}
       >
         {banners.map((banner) => {
@@ -160,13 +160,17 @@ export function BannerCarousel() {
             <div key={banner.id} className="h-full w-full shrink-0">
               <SlideFrame href={href} label={label}>
                 {mobile ? (
-                  <img src={mobile} alt="" className="h-full w-full object-cover md:hidden" draggable={false} />
+                  <img src={mobile} alt="" className="h-full w-full object-contain md:hidden" draggable={false} />
                 ) : null}
                 {desktop ? (
                   <img
                     src={desktop}
                     alt={mobile ? "" : label}
-                    className={cn("h-full w-full object-cover", mobile ? "hidden md:block" : "")}
+                    className={
+                      mobile
+                        ? "hidden h-full w-full object-cover md:block"
+                        : "h-full w-full object-contain md:object-cover"
+                    }
                     draggable={false}
                   />
                 ) : null}
