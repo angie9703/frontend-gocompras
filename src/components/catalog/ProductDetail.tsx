@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, ImageOff, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
@@ -93,7 +94,14 @@ export function ProductDetail({ producto }: ProductDetailProps) {
         <div className="min-w-0 max-w-full">
           <div className="relative aspect-square overflow-hidden rounded-xl border border-slate-100 bg-white">
             {imagenActual ? (
-              <img src={imagenActual} alt={titulo} className="size-full object-contain p-4" />
+              <Image
+                src={imagenActual}
+                alt={titulo}
+                fill
+                sizes="(max-width: 1024px) 100vw, 640px"
+                priority
+                className="object-contain p-4"
+              />
             ) : (
               <div className="flex size-full items-center justify-center text-muted">
                 <ImageOff className="size-12" aria-hidden />
@@ -140,7 +148,15 @@ export function ProductDetail({ producto }: ProductDetailProps) {
                     )}
                     aria-label={variante ? `Ver variante ${etiqueta}` : `Ver imagen ${index + 1}`}
                   >
-                    <img src={item.url} alt="" className="size-full object-cover" />
+                    <Image
+                      src={item.url}
+                      alt=""
+                      width={64}
+                      height={64}
+                      sizes="64px"
+                      loading="lazy"
+                      className="size-full object-cover"
+                    />
                   </button>
                 );
               })}

@@ -1,6 +1,7 @@
 "use client";
 
 import { LayoutGrid, Package } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { CatalogQueryState } from "@/lib/catalogQuery";
 import { cn } from "@/lib/cn";
@@ -28,7 +29,18 @@ interface Burbuja {
 function BurbujaImagen({ src }: { src?: string }) {
   const [rota, setRota] = useState(false);
   if (!src || rota) return <Package className="size-5" aria-hidden />;
-  return <img src={src} alt="" className="size-full object-contain" onError={() => setRota(true)} />;
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={56}
+      height={56}
+      sizes="56px"
+      loading="lazy"
+      className="size-full object-contain"
+      onError={() => setRota(true)}
+    />
+  );
 }
 
 const RESET_FILTROS: Partial<CatalogQueryState> = {

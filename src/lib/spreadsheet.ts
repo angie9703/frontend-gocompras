@@ -1,4 +1,3 @@
-import Papa from "papaparse";
 import type { CargaMasivaItem } from "@/types";
 
 const HEADER_ALIASES: Record<string, string> = {
@@ -139,7 +138,8 @@ function mapHeader(header: string): string {
   return HEADER_ALIASES[normalizeHeader(header)] ?? "";
 }
 
-export function parseProductosCsv(text: string): CargaMasivaItem[] {
+export async function parseProductosCsv(text: string): Promise<CargaMasivaItem[]> {
+  const { default: Papa } = await import("papaparse");
   const parsed = Papa.parse<Record<string, unknown>>(text.replace(/^\uFEFF/, ""), {
     header: true,
     skipEmptyLines: "greedy",

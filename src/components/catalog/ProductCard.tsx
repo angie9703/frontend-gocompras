@@ -1,6 +1,7 @@
 "use client";
 
 import { Package, ShoppingBag } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { type ChangeEvent, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
@@ -66,10 +67,13 @@ export function ProductCard({ producto, compact = false }: ProductCardProps) {
             {mostrarPlaceholder ? (
               <Package className="size-10 text-gray-400" aria-hidden />
             ) : (
-              <img
+              <Image
                 src={imagenUrl}
                 alt={titulo}
-                className="h-full w-full object-contain object-center p-2"
+                fill
+                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 280px"
+                loading="lazy"
+                className="object-contain object-center p-2"
                 onError={() => setImagenRota(imagenUrl)}
               />
             )}

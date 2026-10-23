@@ -36,6 +36,7 @@ export function Footer() {
             width={180}
             height={50}
             className="h-10 w-auto bg-transparent object-contain"
+            loading="lazy"
           />
           <p className="mt-3 max-w-xs text-sm text-muted">
             {ajustes?.textoFooter?.trim() ||

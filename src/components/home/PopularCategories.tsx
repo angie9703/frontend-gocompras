@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight, Package } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { buildCatalogPath } from "@/lib/catalogQuery";
@@ -81,7 +82,15 @@ export function PopularCategories() {
               >
                 <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#e8f6fe] bg-linear-to-b from-[#f0f9fe] to-[#e1f3ff] p-1.5 text-slate-500 ring-2 ring-[#84a5ba] isolate transition-[scale,box-shadow] duration-200 group-hover:scale-105 md:h-16 md:w-16 lg:h-28 lg:w-28 lg:p-2.5 lg:ring-[3px] lg:group-hover:shadow-md">
                   {categoria.imagenUrl ? (
-                    <img src={categoria.imagenUrl} alt="" className="size-full object-contain" />
+                    <Image
+                      src={categoria.imagenUrl}
+                      alt=""
+                      width={112}
+                      height={112}
+                      sizes="(max-width: 1024px) 64px, 112px"
+                      loading="lazy"
+                      className="size-full object-contain"
+                    />
                   ) : (
                     <Package className="size-5 md:size-6 lg:size-8" aria-hidden />
                   )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
@@ -128,9 +129,13 @@ export function CartDrawer() {
                     <div className="flex gap-3">
                       <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-surface">
                         {item.imagenUrl ? (
-                          <img
+                          <Image
                             src={item.imagenUrl}
                             alt={item.nombre}
+                            width={80}
+                            height={80}
+                            sizes="80px"
+                            loading="lazy"
                             className="size-full object-cover"
                           />
                         ) : (

@@ -2,11 +2,15 @@ import { BannerCarousel } from "@/components/home/BannerCarousel";
 import { FeaturedProducts } from "@/components/home/FeaturedProducts";
 import { BenefitsBar } from "@/components/home/HeroBanner";
 import { PopularCategories } from "@/components/home/PopularCategories";
+import { bannersVisibles } from "@/lib/banners";
+import { getBannersActivos } from "@/services/banners";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const banners = bannersVisibles(await getBannersActivos());
+
   return (
     <>
-      <BannerCarousel />
+      <BannerCarousel initialBanners={banners} />
       <PopularCategories />
       <FeaturedProducts />
       <BenefitsBar />

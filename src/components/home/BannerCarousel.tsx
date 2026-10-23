@@ -1,44 +1,42 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { bannerImages, bannerLink, bannersVisibles } from "@/lib/banners";
+import { cn } from "@/lib/cn";
 import { getBannersActivos } from "@/services/banners";
 import type { Banner } from "@/types";
-import { cn } from "@/lib/cn";
 
-function bannerLink(banner: Banner): string | null {
-  const href = banner.link_url?.trim() || banner.linkUrl?.trim() || banner.linkDestino?.trim() || banner.ctaHref?.trim() || "";
-  return href || null;
-}
-
-function bannerImages(banner: Banner): { desktop: string | null; mobile: string | null } {
-  const desktop = banner.imagenUrl?.trim() || banner.imagen_url?.trim() || null;
-  const mobile = banner.imagenMobileUrl?.trim() || banner.imagen_mobile_url?.trim() || null;
-  return { desktop, mobile };
-}
-
-function bannerOrden(banner: Banner): number {
-  const orden = Number(banner.orden);
-  return Number.isFinite(orden) ? orden : 0;
-}
-
-function bannerEstaActivo(banner: Banner, now = Date.now()): boolean {
-  if (banner.activo === false || banner.publicado === false) return false;
-  if (banner.fechaInicio) {
-    const inicio = Date.parse(banner.fechaInicio);
-    if (Number.isFinite(inicio) && inicio > now) return false;
-  }
-  if (banner.fechaFin) {
-    const fin = Date.parse(banner.fechaFin);
-    if (Number.isFinite(fin) && fin < now) return false;
-  }
-  const images = bannerImages(banner);
-  return Boolean(images.desktop || images.mobile);
-}
+const BANNER_SIZES = "(max-width: 768px) 100vw, 1280px";
 
 function esControl(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest("[data-carousel-control]"));
+}
+
+function BannerImage({
+  src,
+  alt,
+  className,
+  priority,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  priority: boolean;
+}) {
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes={BANNER_SIZES}
+      className={className}
+      draggable={false}
+      {...(priority ? { priority: true } : { loading: "lazy" as const })}
+    />
+  );
 }
 
 function SlideFrame({ href, label, children }: { href: string | null; label: string; children: ReactNode }) {
@@ -57,23 +55,22 @@ function SlideFrame({ href, label, children }: { href: string | null; label: str
   );
 }
 
-export function BannerCarousel() {
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [loading, setLoading] = useState(true);
+export function BannerCarousel({ initialBanners }: { initialBanners?: Banner[] }) {
+  const provided = initialBanners !== undefined;
+  const [banners, setBanners] = useState<Banner[]>(() => initialBanners ?? []);
+  const [loading, setLoading] = useState(!provided);
   const [index, setIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [manualTick, setManualTick] = useState(0);
   const drag = useRef({ x: 0, moved: false });
 
   useEffect(() => {
+    if (provided) return;
     let cancelled = false;
     void getBannersActivos()
       .then((items) => {
         if (cancelled) return;
-        const visibles = items
-          .filter((item) => bannerEstaActivo(item))
-          .sort((a, b) => bannerOrden(a) - bannerOrden(b) || a.id - b.id);
-        setBanners(visibles);
+        setBanners(bannersVisibles(items));
       })
       .catch(() => {
         if (!cancelled) setBanners([]);
@@ -84,7 +81,7 @@ export function BannerCarousel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [provided]);
 
   const count = banners.length;
   const go = useCallback(
@@ -150,28 +147,32 @@ export function BannerCarousel() {
         className="relative z-0 flex aspect-[4/3] w-full transition-transform duration-500 ease-out md:aspect-auto md:h-[22rem]"
         style={{ transform: `translateX(-${index * 100}%)` }}
       >
-        {banners.map((banner) => {
+        {banners.map((banner, slideIndex) => {
           const images = bannerImages(banner);
           const href = bannerLink(banner);
           const label = banner.titulo?.trim() || "Banner promocional";
           const desktop = images.desktop || images.mobile;
           const mobile = images.mobile;
+          const isFirst = slideIndex === 0;
           return (
-            <div key={banner.id} className="h-full w-full shrink-0">
+            <div key={banner.id} className="relative h-full w-full shrink-0">
               <SlideFrame href={href} label={label}>
                 {mobile ? (
-                  <img src={mobile} alt="" className="h-full w-full object-contain md:hidden" draggable={false} />
+                  <BannerImage
+                    src={mobile}
+                    alt=""
+                    priority={isFirst}
+                    className="object-contain md:hidden"
+                  />
                 ) : null}
                 {desktop ? (
-                  <img
+                  <BannerImage
                     src={desktop}
                     alt={mobile ? "" : label}
+                    priority={isFirst}
                     className={
-                      mobile
-                        ? "hidden h-full w-full object-cover md:block"
-                        : "h-full w-full object-contain md:object-cover"
+                      mobile ? "hidden object-cover md:block" : "object-contain md:object-cover"
                     }
-                    draggable={false}
                   />
                 ) : null}
               </SlideFrame>

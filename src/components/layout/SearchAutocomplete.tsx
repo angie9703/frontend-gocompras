@@ -1,6 +1,7 @@
 "use client";
 
 import { ImageOff, Loader2, Search } from "lucide-react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   type ChangeEvent,
@@ -191,9 +192,13 @@ export function SearchAutocomplete({
                     >
                       <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface">
                         {imagenUrl ? (
-                          <img
+                          <Image
                             src={imagenUrl}
                             alt=""
+                            width={48}
+                            height={48}
+                            sizes="48px"
+                            loading="lazy"
                             className="size-full object-cover"
                           />
                         ) : (

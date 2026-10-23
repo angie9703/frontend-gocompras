@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, ChevronDown, FileText, ImageOff, MessageCircle, ShoppingBag } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -166,7 +167,15 @@ function ResumenItems({ items, className }: { items: CartItem[]; className?: str
         <li key={item.varianteId} className="flex gap-3">
           <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-surface">
             {item.imagenUrl ? (
-              <img src={item.imagenUrl} alt="" className="size-full object-cover" />
+              <Image
+                src={item.imagenUrl}
+                alt=""
+                width={56}
+                height={56}
+                sizes="56px"
+                loading="lazy"
+                className="size-full object-cover"
+              />
             ) : (
               <div className="flex size-full items-center justify-center text-muted">
                 <ImageOff className="size-5" aria-hidden />
