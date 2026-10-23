@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -8,7 +9,16 @@ function esControl(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest("[data-carousel-control]"));
 }
 
-export function BannerCarousel({ count, children }: { count: number; children: ReactNode }) {
+export function BannerCarousel({
+  count,
+  href,
+  children,
+}: {
+  count: number;
+  href: string | null;
+  children: ReactNode;
+}) {
+  const router = useRouter();
   const [index, setIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [manualTick, setManualTick] = useState(0);
@@ -33,7 +43,7 @@ export function BannerCarousel({ count, children }: { count: number; children: R
 
   return (
     <div
-      className="absolute inset-0 touch-pan-y"
+      className="absolute inset-0 z-10 touch-pan-y"
       aria-roledescription="carrusel"
       aria-label="Banners promocionales"
       onPointerDown={(event) => {
@@ -56,10 +66,16 @@ export function BannerCarousel({ count, children }: { count: number; children: R
       }}
       onPointerCancel={() => setDragging(false)}
       onClickCapture={(event) => {
-        if (!drag.current.moved) return;
+        if (drag.current.moved) {
+          event.preventDefault();
+          event.stopPropagation();
+          drag.current.moved = false;
+          return;
+        }
+        if (esControl(event.target) || index !== 0 || !href) return;
         event.preventDefault();
-        event.stopPropagation();
-        drag.current.moved = false;
+        if (href.startsWith("/")) router.push(href);
+        else window.location.assign(href);
       }}
     >
       <div

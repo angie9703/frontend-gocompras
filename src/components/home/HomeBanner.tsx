@@ -5,23 +5,41 @@ import { BannerCarousel } from "@/components/home/BannerCarousel";
 import { bannerImages, bannerLink } from "@/lib/banners";
 import type { Banner } from "@/types";
 
-function SlideFrame({ href, label, children }: { href: string | null; label: string; children: ReactNode }) {
-  if (!href) return <div className="absolute inset-0 block">{children}</div>;
+function BannerAnchor({
+  href,
+  label,
+  className,
+  children,
+}: {
+  href: string | null;
+  label: string;
+  className: string;
+  children: ReactNode;
+}) {
+  if (!href) return <div className={className}>{children}</div>;
   if (href.startsWith("/")) {
     return (
-      <Link href={href} className="absolute inset-0 block" aria-label={label}>
+      <Link href={href} className={className} aria-label={label}>
         {children}
       </Link>
     );
   }
   return (
-    <a href={href} className="absolute inset-0 block" aria-label={label}>
+    <a href={href} className={className} aria-label={label}>
       {children}
     </a>
   );
 }
 
-function FirstBannerSlide({ banner }: { banner: Banner }) {
+function SlideFrame({ href, label, children }: { href: string | null; label: string; children: ReactNode }) {
+  return (
+    <BannerAnchor href={href} label={label} className="absolute inset-0 block">
+      {children}
+    </BannerAnchor>
+  );
+}
+
+function FirstBannerImage({ banner }: { banner: Banner }) {
   const images = bannerImages(banner);
   const mobileSrc = images.mobile || images.desktop;
   const desktopSrc = images.desktop || images.mobile;
@@ -29,28 +47,30 @@ function FirstBannerSlide({ banner }: { banner: Banner }) {
   const label = banner.titulo?.trim() || "Banner promocional";
 
   return (
-    <div className="relative aspect-[4/3] min-w-full shrink-0 md:aspect-auto md:h-[22rem]">
-      <SlideFrame href={bannerLink(banner)} label={label}>
-        <Image
-          src={mobileSrc}
-          alt=""
-          fill
-          priority={true}
-          sizes="100vw"
-          className="block object-contain md:hidden"
-          draggable={false}
-        />
-        <Image
-          src={desktopSrc}
-          alt={label}
-          fill
-          priority={true}
-          sizes="(max-width: 768px) 100vw, 1280px"
-          className="hidden object-cover md:block"
-          draggable={false}
-        />
-      </SlideFrame>
-    </div>
+    <BannerAnchor href={bannerLink(banner)} label={label} className="relative block">
+      <Image
+        src={mobileSrc}
+        alt={label}
+        width={1080}
+        height={810}
+        priority={true}
+        fetchPriority="high"
+        loading="eager"
+        decoding="sync"
+        sizes="100vw"
+        draggable={false}
+        className="block aspect-[4/3] h-auto w-full object-contain md:hidden"
+      />
+      <Image
+        src={desktopSrc}
+        alt=""
+        width={1280}
+        height={352}
+        sizes="(max-width: 768px) 100vw, 1280px"
+        draggable={false}
+        className="hidden h-[22rem] w-full object-cover md:block"
+      />
+    </BannerAnchor>
   );
 }
 
@@ -94,13 +114,16 @@ export function HomeBanner({ banners }: { banners: Banner[] }) {
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:pt-6">
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-100 md:aspect-auto md:h-[22rem]">
-        <BannerCarousel count={banners.length}>
-          <FirstBannerSlide banner={first} />
-          {rest.map((banner) => (
-            <RestBannerSlide key={banner.id} banner={banner} />
-          ))}
-        </BannerCarousel>
+      <div className="relative w-full overflow-hidden rounded-2xl bg-slate-100">
+        <FirstBannerImage banner={first} />
+        {rest.length > 0 ? (
+          <BannerCarousel count={banners.length} href={bannerLink(first)}>
+            <div className="h-full min-w-full shrink-0" aria-hidden="true" />
+            {rest.map((banner) => (
+              <RestBannerSlide key={banner.id} banner={banner} />
+            ))}
+          </BannerCarousel>
+        ) : null}
       </div>
     </section>
   );
