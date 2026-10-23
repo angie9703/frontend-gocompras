@@ -79,11 +79,11 @@ export function PopularCategories() {
                   centrarFila(index, categorias.length),
                 )}
               >
-                <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#dcefec] bg-linear-to-b from-[#f8f8f0] via-[#dcefec] to-[#b9e5ea] p-1.5 ring-2 ring-[#8bb8c2] isolate transition-[scale,box-shadow] duration-200 group-hover:scale-105 group-hover:ring-[#5f99a6] md:h-16 md:w-16 lg:h-28 lg:w-28 lg:p-2.5 lg:ring-[3px] lg:group-hover:shadow-md">
+                <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#e8f6fe] bg-linear-to-b from-[#f0f9fe] to-[#e1f3ff] p-1.5 text-slate-500 ring-2 ring-[#84a5ba] isolate transition-[scale,box-shadow] duration-200 group-hover:scale-105 md:h-16 md:w-16 lg:h-28 lg:w-28 lg:p-2.5 lg:ring-[3px] lg:group-hover:shadow-md">
                   {categoria.imagenUrl ? (
                     <img src={categoria.imagenUrl} alt="" className="size-full object-contain" />
                   ) : (
-                    <Package className="size-5 text-[#5f99a6] md:size-6 lg:size-8" aria-hidden />
+                    <Package className="size-5 md:size-6 lg:size-8" aria-hidden />
                   )}
                 </span>
                 <span className="mt-1 line-clamp-2 px-0.5 text-center text-xs leading-tight font-medium text-slate-800 transition-colors duration-200 group-hover:text-brand-orange md:mt-2 lg:mt-3 lg:px-0 lg:text-base lg:leading-5 lg:font-semibold">
