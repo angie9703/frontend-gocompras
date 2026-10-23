@@ -1,6 +1,6 @@
-import { BannerCarousel } from "@/components/home/BannerCarousel";
 import { FeaturedProducts } from "@/components/home/FeaturedProducts";
 import { BenefitsBar } from "@/components/home/HeroBanner";
+import { HomeBanner } from "@/components/home/HomeBanner";
 import { PopularCategories } from "@/components/home/PopularCategories";
 import { bannersVisibles } from "@/lib/banners";
 import { getBannersActivos } from "@/services/banners";
@@ -10,7 +10,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <BannerCarousel initialBanners={banners} />
+      <HomeBanner banners={banners} />
       <PopularCategories />
       <FeaturedProducts />
       <BenefitsBar />

@@ -521,6 +521,7 @@ export function CatalogView() {
           drawerOpen ? "pointer-events-auto" : "pointer-events-none",
         )}
         aria-hidden={!drawerOpen}
+        inert={!drawerOpen}
       >
         <button
           type="button"

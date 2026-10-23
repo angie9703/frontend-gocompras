@@ -258,6 +258,7 @@ export function Header() {
       <div
         className={cn("fixed inset-0 z-40 md:hidden", menuOpen ? "pointer-events-auto" : "pointer-events-none")}
         aria-hidden={!menuOpen}
+        inert={!menuOpen}
       >
         <button
           type="button"
@@ -265,6 +266,7 @@ export function Header() {
             "absolute inset-0 bg-slate-950/40 transition-opacity",
             menuOpen ? "opacity-100" : "opacity-0",
           )}
+          tabIndex={menuOpen ? 0 : -1}
           aria-label="Cerrar menú"
           onClick={() => setMenuOpen(false)}
         />
