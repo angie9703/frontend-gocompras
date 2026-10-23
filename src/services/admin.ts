@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAuthToken } from "@/lib/authToken";
 import { friendlyUserError } from "@/lib/errors";
 import type {
   AdminCliente,
@@ -12,7 +13,8 @@ import type {
   Producto,
   Promocion,
 } from "@/types";
-import api from "@/services/api";
+import api, { API_BASE_URL } from "@/services/api";
+import { revalidateBanners } from "@/services/revalidateBanners";
 
 function getApiErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
@@ -26,6 +28,14 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   }
   if (error instanceof Error && error.message) return error.message;
   return fallback;
+}
+
+async function purgeHomeBanners(): Promise<void> {
+  try {
+    await revalidateBanners();
+  } catch {
+    // The banner is already saved. The home fetch also expires within 60 seconds.
+  }
 }
 
 function unwrapList<T>(payload: unknown): T[] {
@@ -153,8 +163,26 @@ export async function updateAdminPromocion(
 
 export async function listAdminBanners(): Promise<Banner[]> {
   try {
-    const { data } = await api.get<ApiResponse<Banner[]>>("/admin/banners");
-    return unwrapList<Banner>(data.data);
+    const headers = new Headers({ Accept: "application/json" });
+    const token = getAuthToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    const response = await fetch(`${API_BASE_URL}/admin/banners`, {
+      cache: "no-store",
+      headers,
+    });
+    const body = (await response.json().catch(() => null)) as
+      | ApiResponse<Banner[]>
+      | ApiErrorResponse
+      | null;
+    if (!response.ok || !body || body.success === false) {
+      const message =
+        body && body.success === false && body.error?.message
+          ? body.error.message
+          : "No se pudieron cargar los banners.";
+      throw new Error(message);
+    }
+    return unwrapList<Banner>(body.data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudieron cargar los banners."));
   }
@@ -179,6 +207,7 @@ export async function createAdminBanner(payload: {
 }): Promise<Banner> {
   try {
     const { data } = await api.post<ApiResponse<Banner>>("/admin/banners", payload);
+    await purgeHomeBanners();
     return data.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo crear el banner."));
@@ -207,6 +236,7 @@ export async function updateAdminBanner(
 ): Promise<Banner> {
   try {
     const { data } = await api.patch<ApiResponse<Banner>>(`/admin/banners/${id}`, payload);
+    await purgeHomeBanners();
     return data.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo actualizar el banner."));
@@ -216,6 +246,7 @@ export async function updateAdminBanner(
 export async function deleteAdminBanner(id: number): Promise<void> {
   try {
     await api.delete(`/admin/banners/${id}`);
+    await purgeHomeBanners();
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo eliminar el banner."));
   }

@@ -9,8 +9,10 @@ type RetriableConfig = InternalAxiosRequestConfig & {
 
 const SAFE_RETRY_METHODS = new Set(["get", "head", "options"]);
 
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1",
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
