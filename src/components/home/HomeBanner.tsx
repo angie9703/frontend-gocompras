@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { preload } from "react-dom";
 import type { ReactNode } from "react";
 import { BannerCarousel } from "@/components/home/BannerCarousel";
 import { bannerImages, bannerLink } from "@/lib/banners";
@@ -41,23 +42,27 @@ function SlideFrame({ href, label, children }: { href: string | null; label: str
 
 function FirstBannerImage({ banner }: { banner: Banner }) {
   const images = bannerImages(banner);
-  const mobileSrc = images.mobile || images.desktop;
+  const bannerMobileUrl = images.mobile || images.desktop;
   const desktopSrc = images.desktop || images.mobile;
-  if (!mobileSrc || !desktopSrc) return null;
+  if (!bannerMobileUrl || !desktopSrc) return null;
   const label = banner.titulo?.trim() || "Banner promocional";
+
+  preload(bannerMobileUrl, { as: "image", fetchPriority: "high" });
 
   return (
     <BannerAnchor href={bannerLink(banner)} label={label} className="relative block">
       <Image
-        src={mobileSrc}
+        src={bannerMobileUrl}
         alt={label}
         width={1080}
         height={810}
+        unoptimized
         priority={true}
         fetchPriority="high"
         loading="eager"
-        decoding="sync"
+        decoding="async"
         sizes="100vw"
+        placeholder="empty"
         draggable={false}
         className="block aspect-[4/3] h-auto w-full object-contain md:hidden"
       />
