@@ -102,6 +102,7 @@ export function ProductosView() {
   const [sortKey, setSortKey] = useState<SortKey>("nombre_asc");
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [marcasDeSeleccion, setMarcasDeSeleccion] = useState<Marca[] | null>(null);
   const [items, setItems] = useState<InventarioFila[]>([]);
   const [meta, setMeta] = useState<InventarioListMeta>({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [page, setPage] = useState(1);
@@ -187,6 +188,65 @@ export function ProductosView() {
     const nombres = categorias.find((categoria) => String(categoria.id) === categoriaId)?.subcategorias ?? [];
     return [...nombres].sort((a, b) => a.localeCompare(b, "es"));
   }, [categoriaId, categorias]);
+
+  const hayRubro = Boolean(categoriaId || selectedSubcategoria);
+  const marcasVisibles = useMemo(() => {
+    if (!hayRubro) return marcas;
+    return marcasDeSeleccion ?? [];
+  }, [hayRubro, marcas, marcasDeSeleccion]);
+
+  useEffect(() => {
+    if (!categoriaId && !selectedSubcategoria) {
+      setMarcasDeSeleccion(null);
+      return;
+    }
+
+    let cancelled = false;
+    setMarcasDeSeleccion(null);
+
+    void (async () => {
+      const nombres = new Set<string>();
+      let page = 1;
+      let totalPages = 1;
+
+      try {
+        do {
+          const result = await listAdminInventario({
+            page,
+            pageSize: 100,
+            categoriaId: categoriaId ? Number(categoriaId) : undefined,
+            subcategoriaId: selectedSubcategoria || undefined,
+          });
+          if (cancelled) return;
+          for (const fila of result.items) {
+            const nombre = fila.marca?.trim().toLocaleLowerCase("es");
+            if (nombre) nombres.add(nombre);
+          }
+          totalPages = result.meta.totalPages > 0 ? result.meta.totalPages : 1;
+          page += 1;
+        } while (page <= totalPages && page <= 30);
+      } catch {
+        if (!cancelled) setMarcasDeSeleccion([]);
+        return;
+      }
+
+      if (cancelled) return;
+      setMarcasDeSeleccion(
+        marcas.filter((marca) => nombres.has(marca.nombre.trim().toLocaleLowerCase("es"))),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categoriaId, selectedSubcategoria, marcas]);
+
+  useEffect(() => {
+    if (!selectedMarca) return;
+    if (marcasVisibles.some((marca) => String(marca.id) === selectedMarca)) return;
+    if (hayRubro && marcasDeSeleccion == null) return;
+    setSelectedMarca("");
+  }, [hayRubro, marcasDeSeleccion, marcasVisibles, selectedMarca]);
 
   const visibles = useMemo(() => {
     return items.filter((fila) => {
@@ -597,6 +657,7 @@ export function ProductosView() {
           onChange={(event) => {
             setCategoriaId(event.target.value);
             setSelectedSubcategoria("");
+            setSelectedMarca("");
           }}
           className={selectClass}
           aria-label="Filtrar por categoría"
@@ -610,7 +671,10 @@ export function ProductosView() {
         </select>
         <select
           value={categoriaId ? selectedSubcategoria : ""}
-          onChange={(event) => setSelectedSubcategoria(event.target.value)}
+          onChange={(event) => {
+            setSelectedSubcategoria(event.target.value);
+            setSelectedMarca("");
+          }}
           className={selectClass}
           aria-label="Filtrar por subcategoría"
           disabled={!categoriaId}
@@ -629,7 +693,7 @@ export function ProductosView() {
           aria-label="Filtrar por marca"
         >
           <option value="">Todas las marcas</option>
-          {marcas.map((marca) => (
+          {marcasVisibles.map((marca) => (
             <option key={marca.id} value={marca.id}>
               {marca.nombre}
             </option>
