@@ -37,7 +37,7 @@ export function ProductCard({ producto, compact = false }: ProductCardProps) {
   const imagenUrl = selectedVariant?.imagenUrl || getProductoImagen(producto, selectedVariant);
   const [imagenRota, setImagenRota] = useState<string | null>(null);
   const mostrarPlaceholder = !imagenUrl || imagenRota === imagenUrl;
-  const titulo = tituloTarjetaProducto(producto, selectedVariant);
+  const titulo = tituloTarjetaProducto(producto);
   const especificacion = especificacionTarjeta(selectedVariant, titulo);
 
   const onSelectVariante = (event: ChangeEvent<HTMLSelectElement>) => {

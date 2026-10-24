@@ -159,25 +159,12 @@ function medidasDesdeNombre(nombre: string): string[] {
   return [...new Set(hallazgos.sort((a, b) => a.start - b.start).map((item) => item.text))].slice(0, 3);
 }
 
-const TOKEN_MEDIDA =
-  /\d+\s*x\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|A|W|V)?|\d+(?:[.,]\d+)?\s*(?:mm|cm|A|W|V)\b/gi;
-
 function compactarMedida(valor: string): string {
   return valor.replace(/\s+/g, "");
 }
 
 function esTokenMedida(valor: string): boolean {
   return /^(?:\d+x)?\d+(?:[.,]\d+)?(?:mm|cm|m|a|w|v)$/i.test(compactarMedida(valor));
-}
-
-function familiaMedida(valor: string): "mm" | "A" | "W" | "V" | "m" | null {
-  const compacto = compactarMedida(valor);
-  if (/mm$/i.test(compacto)) return "mm";
-  if (/A$/i.test(compacto) || /^\d+x\d+/i.test(compacto)) return "A";
-  if (/W$/i.test(compacto)) return "W";
-  if (/V$/i.test(compacto)) return "V";
-  if (/m$/i.test(compacto)) return "m";
-  return null;
 }
 
 function valorMedidaDeVariante(variante: Variante): string | null {
@@ -199,59 +186,8 @@ function valorMedidaDeVariante(variante: Variante): string | null {
   return null;
 }
 
-function nombrePropioDeVariante(variante: Variante): string {
-  const extra = variante as Variante & { nombre_producto?: string | null };
-  return extra.nombre_producto?.trim() || variante.atributos?.nombre_producto?.trim() || "";
-}
-
-function reemplazarMedida(nombre: string, valor: string): string | null {
-  const familia = familiaMedida(valor);
-  if (!familia) return null;
-
-  const patron = new RegExp(TOKEN_MEDIDA.source, "gi");
-  let match: RegExpExecArray | null;
-  while ((match = patron.exec(nombre))) {
-    if (familiaMedida(match[0]) !== familia) continue;
-    const actual = compactarMedida(match[0]);
-    if (actual.toLowerCase() === valor.toLowerCase()) return nombre;
-    return `${nombre.slice(0, match.index)}${valor}${nombre.slice(match.index + match[0].length)}`;
-  }
-
-  return null;
-}
-
-function tituloConMedida(base: string, valor: string, producto: Producto): string {
-  const reemplazado = reemplazarMedida(base, valor);
-  if (reemplazado) return reemplazado;
-
-  const marca = producto.marca?.nombre?.trim() ?? "";
-  let nucleo = base;
-  if (marca && nucleo.toLowerCase().endsWith(marca.toLowerCase())) {
-    nucleo = nucleo.slice(0, nucleo.length - marca.length).trim();
-  }
-  nucleo = nucleo
-    .replace(new RegExp(TOKEN_MEDIDA.source, "gi"), "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-
-  const partes = [nucleo, valor];
-  if (marca && !nucleo.toLowerCase().includes(marca.toLowerCase())) partes.push(marca);
-  return partes.filter(Boolean).join(" ");
-}
-
-export function tituloTarjetaProducto(producto: Producto, variante?: Variante): string {
-  const padre = producto.nombre?.trim() || "";
-  if (!variante) return padre;
-
-  const propio = nombrePropioDeVariante(variante);
-  if (propio && propio.localeCompare(padre, "es", { sensitivity: "accent" }) !== 0) return propio;
-
-  const valor = valorMedidaDeVariante(variante);
-  if (valor) {
-    return tituloConMedida(propio || variante.nombre?.trim() || padre, valor, producto);
-  }
-
-  return variante.nombre?.trim() || padre;
+export function tituloTarjetaProducto(producto: Producto): string {
+  return producto.nombre?.trim() || "";
 }
 
 export function especificacionTarjeta(

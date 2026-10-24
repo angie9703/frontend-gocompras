@@ -41,7 +41,7 @@ export function ProductDetail({ producto }: ProductDetailProps) {
 
   const selectedVariante: Variante | undefined =
     variantes.find((variante) => variante.sku === selectedSku) ?? variantes[0];
-  const titulo = tituloTarjetaProducto(producto, selectedVariante);
+  const titulo = tituloTarjetaProducto(producto);
   const imagenActual = galeria[Math.min(imageIndex, Math.max(galeria.length - 1, 0))]?.url ?? null;
   const enStock = (selectedVariante?.stockDisponible ?? 0) > 0;
   const maxCantidad = selectedVariante?.stockDisponible ?? 0;

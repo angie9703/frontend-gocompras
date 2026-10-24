@@ -79,76 +79,6 @@ function MasterCheckbox({
   );
 }
 
-const MEDIDA_RE = /\d+(?:[.,]\d+)?\s*x\s*\d+(?:[.,]\d+)?\s*mm|\d+(?:[.,]\d+)?\s*mm/gi;
-
-function compacto(value: string): string {
-  return value.toLowerCase().replace(/[\s._-]+/g, "");
-}
-
-function medidaCanonica(value: string): string | null {
-  const match = value.match(/\d+(?:[.,]\d+)?\s*x\s*\d+(?:[.,]\d+)?\s*mm|\d+(?:[.,]\d+)?\s*mm/i);
-  if (!match) return null;
-  return compacto(match[0]);
-}
-
-function medidaDesdeSku(sku: string): string | null {
-  const compuesto = sku.toUpperCase().match(/(\d+(?:[.,]\d+)?)X(\d+(?:[.,]\d+)?)MM/);
-  if (compuesto) return `${compuesto[1].replace(",", ".")}x${compuesto[2].replace(",", ".")}mm`;
-  const simple = sku.toUpperCase().match(/(?:^|[^0-9])(\d+(?:[.,]\d+)?)MM/);
-  if (simple) return `${simple[1].replace(",", ".")}mm`;
-  return null;
-}
-
-function tituloConMedida(titulo: string, medida: string): string {
-  const re = new RegExp(MEDIDA_RE.source, "gi");
-  let reemplazo = false;
-  const ajustado = titulo.replace(re, (encontrada) => {
-    if (compacto(encontrada) === compacto(medida)) return encontrada;
-    if (reemplazo) return encontrada;
-    reemplazo = true;
-    return medida;
-  });
-  if (compacto(ajustado).includes(compacto(medida))) return ajustado.replace(/\s{2,}/g, " ").trim();
-  const metro = ajustado.match(/\s+x\s+metro\b/i);
-  if (metro?.index != null) {
-    return `${ajustado.slice(0, metro.index)} ${medida}${ajustado.slice(metro.index)}`.replace(/\s{2,}/g, " ").trim();
-  }
-  return `${ajustado} ${medida}`.replace(/\s{2,}/g, " ").trim();
-}
-
-function partesTitulo(titulo: string, medida: string | null): Array<{ text: string; bold: boolean }> {
-  if (!medida) return [{ text: titulo, bold: false }];
-  const numeros = medida.match(/^(\d+(?:[.,]\d+)?)x(\d+(?:[.,]\d+)?)mm$/i);
-  const simple = medida.match(/^(\d+(?:[.,]\d+)?)mm$/i);
-  const re = numeros
-    ? new RegExp(`(${numeros[1]}\\s*x\\s*${numeros[2]}\\s*mm)`, "i")
-    : simple
-      ? new RegExp(`(${simple[1]}\\s*mm)`, "i")
-      : null;
-  const match = re ? titulo.match(re) : null;
-  if (!match || match.index == null) return [{ text: titulo, bold: false }];
-  const inicio = match.index;
-  const fin = inicio + match[0].length;
-  return [
-    { text: titulo.slice(0, inicio), bold: false },
-    { text: titulo.slice(inicio, fin), bold: true },
-    { text: titulo.slice(fin), bold: false },
-  ].filter((parte) => parte.text.length > 0);
-}
-
-function tituloInventario(fila: Pick<InventarioFila, "nombre" | "nombreCompleto" | "variante_nombre" | "sku">): {
-  partes: Array<{ text: string; bold: boolean }>;
-  subtitulo: string | null;
-} {
-  const variante = fila.variante_nombre?.trim() ?? "";
-  const medida = medidaCanonica(variante) || medidaDesdeSku(fila.sku);
-  const base = fila.nombreCompleto?.trim() || fila.nombre.trim();
-  const titulo = medida ? tituloConMedida(base, medida) : base;
-  const plano = compacto(titulo);
-  const subtitulo = variante && !plano.includes(compacto(variante)) ? variante : null;
-  return { partes: partesTitulo(titulo, medida), subtitulo };
-}
-
 function pageNumbers(current: number, total: number): number[] {
   if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
   const start = Math.max(1, Math.min(current - 2, total - 6));
@@ -898,27 +828,7 @@ export function ProductosView() {
                     </td>
                     <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{fila.sku || "—"}</td>
                     <td className="px-3 py-2.5">
-                      {(() => {
-                        const titulo = tituloInventario(fila);
-                        return (
-                          <>
-                            <p className="font-medium text-slate-900">
-                              {titulo.partes.map((parte, index) =>
-                                parte.bold ? (
-                                  <strong key={index} className="font-semibold">
-                                    {parte.text}
-                                  </strong>
-                                ) : (
-                                  <span key={index}>{parte.text}</span>
-                                ),
-                              )}
-                            </p>
-                            {titulo.subtitulo ? (
-                              <p className="text-xs text-slate-500">{titulo.subtitulo}</p>
-                            ) : null}
-                          </>
-                        );
-                      })()}
+                      <p className="font-medium text-slate-900">{fila.nombre.trim() || "—"}</p>
                     </td>
                     <td className="px-3 py-2.5 text-slate-800">
                       {editingMode === "precio" ? (
