@@ -45,6 +45,7 @@ function getErrorMessage(error: unknown): string {
       return "No pudimos conectar con el servidor. Verificá que el backend esté en marcha.";
     }
   }
+  if (error instanceof Error && error.message) return error.message;
   return "Ocurrió un error al cargar el catálogo.";
 }
 

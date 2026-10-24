@@ -15,6 +15,7 @@ import type {
 } from "@/types";
 import api, { API_BASE_URL } from "@/services/api";
 import { revalidateBanners } from "@/services/revalidateBanners";
+import { revalidateProducts } from "@/services/revalidateProducts";
 
 function getApiErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
@@ -36,6 +37,41 @@ async function purgeHomeBanners(): Promise<void> {
   } catch {
     // The banner is already saved. The home fetch also expires within 60 seconds.
   }
+}
+
+async function purgeCatalogo(): Promise<void> {
+  try {
+    await revalidateProducts();
+  } catch {
+    // The product is already saved. Public fetches also expire within 60 seconds.
+  }
+}
+
+async function fetchAdminJson<T>(path: string, fallback: string): Promise<ApiResponse<T>> {
+  const headers = new Headers({
+    Accept: "application/json",
+    "Cache-Control": "no-cache",
+  });
+  const token = getAuthToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
+      headers,
+    });
+  } catch {
+    throw new Error("No pudimos conectar con el servidor. Verificá que el backend esté en marcha.");
+  }
+
+  const body = (await response.json().catch(() => null)) as ApiResponse<T> | ApiErrorResponse | null;
+  if (!response.ok || !body || body.success === false) {
+    const message =
+      body && body.success === false && body.error?.message ? body.error.message : fallback;
+    throw new Error(message);
+  }
+  return body;
 }
 
 function unwrapList<T>(payload: unknown): T[] {
@@ -295,6 +331,7 @@ export async function importarCargaMasiva(
       "/productos/importar",
       payload,
     );
+    await purgeCatalogo();
     return data.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo importar el archivo."));
@@ -306,6 +343,7 @@ export async function deleteAdminProductosMasivo(productIds: number[]): Promise<
     const { data } = await api.delete<ApiResponse<{ eliminados: number; message?: string }>>("/productos/borrar-masivo", {
       data: { productIds },
     });
+    await purgeCatalogo();
     return data.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudieron eliminar los productos."));
@@ -326,6 +364,7 @@ export async function deshacerAdminImportacion(loteId: number): Promise<{ elimin
     const { data } = await api.delete<ApiResponse<{ eliminados: number; message?: string }>>(
       `/productos/importaciones/${loteId}`,
     );
+    await purgeCatalogo();
     return data.data ?? { eliminados: 0 };
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo deshacer la importación."));
@@ -538,17 +577,22 @@ export async function listAdminInventario(params?: {
   subcategoriaId?: string;
 }): Promise<{ items: InventarioFila[]; meta: InventarioListMeta }> {
   try {
-    const { data } = await api.get<ApiResponse<InventarioFila[]>>("/admin/productos", {
-      params: {
-        q: params?.q || undefined,
-        page: params?.page ?? 1,
-        pageSize: params?.pageSize ?? 20,
-        sort: params?.sort,
-        categoriaId: params?.categoriaId,
-        marcaId: params?.marcaId,
-        subcategoriaId: params?.subcategoriaId || undefined,
-      },
+    const page = params?.page ?? 1;
+    const pageSize = params?.pageSize ?? 20;
+    const search = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
     });
+    if (params?.q?.trim()) search.set("q", params.q.trim());
+    if (params?.sort) search.set("sort", params.sort);
+    if (params?.categoriaId) search.set("categoriaId", String(params.categoriaId));
+    if (params?.marcaId) search.set("marcaId", String(params.marcaId));
+    if (params?.subcategoriaId) search.set("subcategoriaId", params.subcategoriaId);
+
+    const data = await fetchAdminJson<InventarioFila[]>(
+      `/admin/productos?${search.toString()}`,
+      "No se pudieron cargar los productos.",
+    );
     const meta = (data.meta ?? {}) as Partial<InventarioListMeta> & { pageSize?: number };
     const limit = meta.limit ?? meta.pageSize ?? params?.pageSize ?? 20;
     const total = meta.total ?? 0;
@@ -588,6 +632,7 @@ export async function bulkInlineUpdateAdminProductos(
     const { data } = await api.post<ApiResponse<{ actualizados: number }>>("/admin/productos/bulk-inline-update", {
       updates,
     });
+    await purgeCatalogo();
     return data.data ?? { actualizados: updates.length };
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudieron guardar los cambios."));
@@ -599,6 +644,7 @@ export async function toggleDestacadoAdminProducto(id: number): Promise<{ id: nu
     const { data } = await api.patch<ApiResponse<{ id: number; esDestacado: boolean }>>(
       `/admin/productos/${id}/toggle-destacado`,
     );
+    await purgeCatalogo();
     return data.data ?? { id, esDestacado: false };
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo actualizar el destacado."));
@@ -608,6 +654,7 @@ export async function toggleDestacadoAdminProducto(id: number): Promise<{ id: nu
 export async function bulkUpdateAdminProductos(payload: BulkUpdatePayload): Promise<{ actualizados: number }> {
   try {
     const { data } = await api.post<ApiResponse<{ actualizados: number }>>("/admin/productos/bulk-update", payload);
+    await purgeCatalogo();
     return data.data ?? { actualizados: 0 };
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo aplicar la edición masiva."));
@@ -620,13 +667,17 @@ export async function listAdminProductos(params?: {
   pageSize?: number;
 }): Promise<{ items: Producto[]; meta?: AdminListMeta }> {
   try {
-    const { data } = await api.get<ApiResponse<Producto[]>>("/admin/productos", {
-      params: {
-        q: params?.q || undefined,
-        page: params?.page ?? 1,
-        pageSize: params?.pageSize ?? 50,
-      },
+    const page = params?.page ?? 1;
+    const pageSize = params?.pageSize ?? 50;
+    const search = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
     });
+    if (params?.q?.trim()) search.set("q", params.q.trim());
+    const data = await fetchAdminJson<Producto[]>(
+      `/admin/productos?${search.toString()}`,
+      "No se pudieron cargar los productos.",
+    );
     return {
       items: unwrapList<Producto>(data.data),
       meta: data.meta as AdminListMeta | undefined,
@@ -689,6 +740,16 @@ export async function uploadAdminImage(payload: { file: string; sku?: string }):
   }
 }
 
+export async function duplicateAdminProducto(id: number): Promise<Producto & { slug: string }> {
+  try {
+    const { data } = await api.post<ApiResponse<Producto & { slug: string }>>(`/productos/${id}/duplicate`);
+    await purgeCatalogo();
+    return data.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "No se pudo duplicar el producto."));
+  }
+}
+
 export async function createAdminProducto(payload: {
   nombre: string;
   descripcion?: string | null;
@@ -714,6 +775,7 @@ export async function createAdminProducto(payload: {
 }): Promise<Producto> {
   try {
     const { data } = await api.post<ApiResponse<Producto>>("/productos", payload);
+    await purgeCatalogo();
     return data.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo crear el producto."));
@@ -723,6 +785,7 @@ export async function createAdminProducto(payload: {
 export async function updateAdminProducto(id: number, payload: AdminProductoPayload): Promise<Producto> {
   try {
     const { data } = await api.patch<ApiResponse<Producto>>(`/productos/${id}`, payload);
+    await purgeCatalogo();
     return data.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo actualizar el producto."));
@@ -734,6 +797,7 @@ export async function deleteAdminProducto(id: number): Promise<{ message?: strin
     const { data } = await api.delete<ApiResponse<{ message?: string; eliminacion?: "fisica" | "logica" }>>(
       `/productos/${id}`,
     );
+    await purgeCatalogo();
     return data.data ?? {};
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo eliminar el producto."));
@@ -747,6 +811,7 @@ export async function updateAdminVariante(
 ): Promise<void> {
   try {
     await api.patch(`/productos/${productoId}/variantes/${varianteId}`, payload);
+    await purgeCatalogo();
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "No se pudo actualizar la variante."));
   }

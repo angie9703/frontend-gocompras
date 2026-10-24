@@ -82,7 +82,7 @@ export function AdminDropdownMenu({
         <div
           role="menu"
           className={cn(
-            "absolute z-20 mt-1 w-48 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg",
+            "absolute z-20 mt-1 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg",
             align === "end" ? "right-0" : "left-0",
           )}
           onClick={() => setOpen(false)}

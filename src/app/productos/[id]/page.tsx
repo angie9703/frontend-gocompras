@@ -1,4 +1,3 @@
-import axios from "axios";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductDetail } from "@/components/catalog/ProductDetail";
@@ -13,9 +12,9 @@ async function fetchProducto(id: string) {
     const response = /^\d+$/.test(id) ? await getProductoById(id) : await getProductoBySlug(id);
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return null;
-    }
+    const status =
+      typeof error === "object" && error && "status" in error ? Number((error as { status?: number }).status) : 0;
+    if (status === 404) return null;
     throw error;
   }
 }

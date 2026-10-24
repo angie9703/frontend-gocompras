@@ -1,5 +1,5 @@
-import type { ApiResponse, Producto, ProductoGrupo } from "@/types";
-import api from "@/services/api";
+import type { ApiErrorResponse, ApiResponse, Producto, ProductoGrupo } from "@/types";
+import api, { API_BASE_URL } from "@/services/api";
 
 export interface GetProductosParams {
   busqueda?: string;
@@ -76,13 +76,45 @@ function toProductosQuery(params?: GetProductosParams): Record<string, string> {
   return query;
 }
 
+function productosFetchInit(): RequestInit {
+  const headers = new Headers({ Accept: "application/json" });
+  if (typeof window === "undefined") {
+    return {
+      headers,
+      next: { tags: ["products"], revalidate: 60 },
+    };
+  }
+
+  headers.set("Cache-Control", "no-cache");
+  return {
+    headers,
+    cache: "no-store",
+  };
+}
+
+async function requestProducto<T>(path: string, fallback: string): Promise<ApiResponse<T>> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, productosFetchInit());
+  } catch {
+    throw new Error("No pudimos conectar con el servidor. Verificá que el backend esté en marcha.");
+  }
+
+  const body = (await response.json().catch(() => null)) as ApiResponse<T> | ApiErrorResponse | null;
+  if (!response.ok || !body || body.success === false) {
+    const message = body && body.success === false && body.error?.message ? body.error.message : fallback;
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  return body;
+}
+
 export async function getProductos(
   params?: GetProductosParams,
 ): Promise<ApiResponse<Producto[]>> {
-  const { data } = await api.get<ApiResponse<Producto[]>>("/productos", {
-    params: toProductosQuery(params),
-  });
-  return data;
+  const query = new URLSearchParams(toProductosQuery(params)).toString();
+  return requestProducto<Producto[]>(`/productos${query ? `?${query}` : ""}`, "No se pudieron cargar los productos.");
 }
 
 function parseProductoGrupo(raw: unknown): ProductoGrupo | null {
@@ -118,10 +150,10 @@ export async function searchProductosGrupos(search?: string): Promise<ProductoGr
 }
 
 export async function getProductoById(id: string | number): Promise<ApiResponse<Producto>> {
-  const { data } = await api.get<ApiResponse<Producto>>(
+  return requestProducto<Producto>(
     `/productos/${encodeURIComponent(String(id))}`,
+    "No se pudo cargar el producto.",
   );
-  return data;
 }
 
 export async function getProductoBySlug(slug: string): Promise<ApiResponse<Producto>> {

@@ -133,9 +133,20 @@ function subcategoriasDeCategoria(categoriaId: string, categorias: Categoria[]):
   return uniqueNombres(fromApi);
 }
 
+function nombreDeCopia(nombre: string): string {
+  const base = nombre.trim();
+  return base ? `${base} - Copia` : "Copia";
+}
+
+function imagenDeReferencia(producto: Producto | null, variante: Variante | undefined): string {
+  const desdeLista = producto?.imagenes?.find((url) => url.trim());
+  return variante?.imagenUrl?.trim() || producto?.imagenUrl?.trim() || desdeLista?.trim() || "";
+}
+
 export function ProductoEditorDrawer({
   producto,
   sku: skuEdicion = null,
+  duplicando = false,
   categorias,
   marcas,
   onClose,
@@ -146,10 +157,18 @@ export function ProductoEditorDrawer({
 }: {
   producto: Producto | null;
   sku?: string | null;
+  duplicando?: boolean;
   categorias: Categoria[];
   marcas: Marca[];
   onClose: () => void;
-  onSaved: () => Promise<void> | void;
+  onSaved: (guardado?: {
+    productoId: number;
+    sku: string;
+    nombre: string;
+    precio: number;
+    precioOferta: number | null;
+    stock: number;
+  }) => Promise<void> | void;
   onSubcategoriasSync?: (
     categoriaId: number,
     nombres: string[],
@@ -163,11 +182,15 @@ export function ProductoEditorDrawer({
 }) {
   const titleId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isCreate = producto == null;
+  const skuInputRef = useRef<HTMLInputElement>(null);
+  const portadaEditadaRef = useRef(false);
+  const isDuplicate = duplicando && producto != null;
+  const isCreate = producto == null || isDuplicate;
   const variante = varianteDelSku(producto, skuEdicion);
+  const imagenReferencia = isDuplicate ? imagenDeReferencia(producto, variante) : "";
   const [tab, setTab] = useState<EditorTab>("general");
-  const [nombre, setNombre] = useState(producto?.nombre ?? "");
-  const [sku, setSku] = useState(variante?.sku ?? "");
+  const [nombre, setNombre] = useState(isDuplicate ? nombreDeCopia(producto.nombre) : (producto?.nombre ?? ""));
+  const [sku, setSku] = useState(isDuplicate ? "" : (variante?.sku ?? ""));
   const [categoriaId, setCategoriaId] = useState(producto?.categoria?.id ? String(producto.categoria.id) : "");
   const [subcategoria, setSubcategoria] = useState(producto?.subcategoria ?? "");
   const [marcaId, setMarcaId] = useState(producto?.marca?.id ? String(producto.marca.id) : "");
@@ -175,16 +198,23 @@ export function ProductoEditorDrawer({
   const [precio, setPrecio] = useState(String(variante?.precioLista ?? variante?.precio ?? ""));
   const [oferta, setOferta] = useState(variante?.precioOferta ? String(variante.precioOferta) : "");
   const [stock, setStock] = useState(String(variante?.stock ?? variante?.stockDisponible ?? 0));
-  const [activo, setActivo] = useState(producto?.activo ?? true);
+  const [activo, setActivo] = useState(isDuplicate ? false : (producto?.activo ?? true));
   const [grupoId, setGrupoId] = useState(producto?.grupoId ?? "");
   const [orden, setOrden] = useState(producto?.orden != null ? String(producto.orden) : "");
-  const [destacado, setDestacado] = useState(producto?.destacado ?? false);
-  const [portada, setPortada] = useState("");
+  const [destacado, setDestacado] = useState(isDuplicate ? false : (producto?.destacado ?? false));
+  const [portada, setPortada] = useState(imagenReferencia);
   const [urlBorrador, setUrlBorrador] = useState("");
   const [portadaLista, setPortadaLista] = useState(isCreate);
-  const [imagenLoading, setImagenLoading] = useState(!isCreate && Boolean(skuEdicion?.trim() || variante?.sku));
+  const [imagenLoading, setImagenLoading] = useState(
+    Boolean((skuEdicion ?? variante?.sku)?.trim()) && (isDuplicate || !isCreate),
+  );
   const [uploading, setUploading] = useState(false);
-  const [specs, setSpecs] = useState(toAttrRows(variante?.atributos));
+  const [specs, setSpecs] = useState(() => {
+    const rows = toAttrRows(variante?.atributos);
+    if (!isDuplicate || !producto) return rows;
+    const copia = nombreDeCopia(producto.nombre);
+    return rows.map((row) => (row.key.trim() === "nombre_producto" ? { ...row, value: copia } : row));
+  });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [gestionSub, setGestionSub] = useState(false);
@@ -216,6 +246,12 @@ export function ProductoEditorDrawer({
     };
   }, [onClose, gestionSub, confirmingDelete]);
 
+  useEffect(() => {
+    if (!isDuplicate) return;
+    const frame = window.requestAnimationFrame(() => skuInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [isDuplicate]);
+
   const handleCategoriaChange = (nextId: string) => {
     setCategoriaId(nextId);
     setGestionSub(false);
@@ -231,22 +267,37 @@ export function ProductoEditorDrawer({
 
   useEffect(() => {
     const skuConsulta = (skuEdicion ?? variante?.sku ?? "").trim();
-    if (isCreate || !skuConsulta) {
+    const referencia = imagenDeReferencia(producto, variante);
+    if (!skuConsulta) {
+      if (isDuplicate) {
+        setPortada(referencia);
+        setPortadaLista(Boolean(referencia));
+      }
+      setImagenLoading(false);
+      return;
+    }
+    if (isCreate && !isDuplicate) {
       setImagenLoading(false);
       return;
     }
 
     let cancelled = false;
     setImagenLoading(true);
-    setPortada("");
+    if (!isDuplicate) setPortada("");
     void getAdminProductoPorSku(skuConsulta)
       .then((data) => {
-        if (cancelled) return;
-        setPortada(data.imagenUrl?.trim() ?? "");
-        setPortadaLista(true);
+        if (cancelled || portadaEditadaRef.current) return;
+        const url = data.imagenUrl?.trim() || (isDuplicate ? referencia : "");
+        setPortada(url);
+        setPortadaLista(Boolean(url) || !isDuplicate);
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
+        if (cancelled || portadaEditadaRef.current) return;
+        if (isDuplicate) {
+          setPortada(referencia);
+          setPortadaLista(Boolean(referencia));
+          return;
+        }
         setPortada("");
         setPortadaLista(false);
         setError(err instanceof Error ? err.message : "No se pudo cargar la imagen de este SKU.");
@@ -258,7 +309,7 @@ export function ProductoEditorDrawer({
     return () => {
       cancelled = true;
     };
-  }, [isCreate, skuEdicion, variante?.sku]);
+  }, [isCreate, isDuplicate, producto, skuEdicion, variante]);
 
   const aplicarUrl = () => {
     const clean = urlBorrador.trim();
@@ -267,6 +318,7 @@ export function ProductoEditorDrawer({
       return;
     }
     setError(null);
+    portadaEditadaRef.current = true;
     setPortada(clean);
     setPortadaLista(true);
     setUrlBorrador("");
@@ -281,6 +333,7 @@ export function ProductoEditorDrawer({
         file: fileData,
         sku: sku.trim() || undefined,
       });
+      portadaEditadaRef.current = true;
       setPortada(imagen.secure_url);
       setPortadaLista(true);
     } catch (err) {
@@ -334,6 +387,10 @@ export function ProductoEditorDrawer({
         : {}),
     };
     const atributos = rowsToAtributos(specs);
+    const nombreNuevo = nombre.trim();
+    if (nombreNuevo && nombreNuevo !== (producto?.nombre ?? "").trim()) {
+      atributos.nombre_producto = nombreNuevo;
+    }
 
     setSaving(true);
     setError(null);
@@ -349,7 +406,7 @@ export function ProductoEditorDrawer({
               stock: stockNumero,
               imagenUrl: portadaUrl,
               atributos,
-              activo: true,
+              activo,
             },
           ],
         });
@@ -358,19 +415,28 @@ export function ProductoEditorDrawer({
           setError("Este producto no tiene una variante editable.");
           return;
         }
-        await Promise.all([
-          updateAdminProducto(producto.id, payloadProducto),
-          updateAdminVariante(producto.id, variante.id, {
-            sku: sku.trim(),
-            precio: precioNumero,
-            stock: stockNumero,
-            precioOferta: ofertaNumero != null && ofertaNumero > 0 ? ofertaNumero : null,
-            ...(portadaLista ? { imagenUrl: portadaUrl } : {}),
-            atributos,
-          }),
-        ]);
+        await updateAdminProducto(producto.id, payloadProducto);
+        await updateAdminVariante(producto.id, variante.id, {
+          sku: sku.trim(),
+          precio: precioNumero,
+          stock: stockNumero,
+          precioOferta: ofertaNumero != null && ofertaNumero > 0 ? ofertaNumero : null,
+          ...(portadaLista ? { imagenUrl: portadaUrl } : {}),
+          atributos,
+        });
       }
-      await onSaved();
+      await onSaved(
+        isCreate
+          ? undefined
+          : {
+              productoId: producto.id,
+              sku: sku.trim(),
+              nombre: nombreNuevo,
+              precio: precioNumero,
+              precioOferta: ofertaNumero != null && ofertaNumero > 0 ? ofertaNumero : null,
+              stock: stockNumero,
+            },
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar el producto.");
     } finally {
@@ -390,10 +456,14 @@ export function ProductoEditorDrawer({
         <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-6 py-5 lg:px-8">
           <div>
             <h3 id={titleId} className="text-lg font-semibold text-slate-900">
-              {isCreate ? "Nuevo producto" : "Editar producto"}
+              {isDuplicate ? "Duplicar producto" : isCreate ? "Nuevo producto" : "Editar producto"}
             </h3>
             <p className="mt-1 text-xs text-slate-500">
-              {isCreate ? "Completá las solapas y publicá el ítem en el catálogo." : `SKU ${skuEdicion ?? variante?.sku ?? "—"}`}
+              {isDuplicate
+                ? "Revisá la copia, cargá un SKU nuevo y guardala pausada."
+                : isCreate
+                  ? "Completá las solapas y publicá el ítem en el catálogo."
+                  : `SKU ${skuEdicion ?? variante?.sku ?? "—"}`}
             </p>
           </div>
           <button
@@ -416,6 +486,12 @@ export function ProductoEditorDrawer({
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6 lg:px-8">
           {error ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
+          {isDuplicate ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              El nombre incluye « - Copia», el SKU quedó vacío y el estado arranca pausado. La imagen original se
+              conserva: podés quitarla en la solapa Imágenes.
+            </p>
+          ) : null}
 
           {tab === "general" ? (
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
@@ -425,7 +501,20 @@ export function ProductoEditorDrawer({
               </label>
               <label className={adminFieldClass}>
                 SKU
-                <Input className="mt-1 font-mono" value={sku} onChange={(event) => setSku(event.target.value)} />
+                <Input
+                  ref={skuInputRef}
+                  className="mt-1 font-mono"
+                  value={sku}
+                  onChange={(event) => setSku(event.target.value)}
+                  placeholder={isDuplicate ? "Ingresá un código nuevo" : undefined}
+                  autoComplete="off"
+                  aria-describedby={isDuplicate ? "ayuda-sku-copia" : undefined}
+                />
+                {isDuplicate ? (
+                  <p id="ayuda-sku-copia" className="mt-1 text-xs font-normal text-slate-500">
+                    El SKU original no se copia. Hace falta un código distinto para guardar la copia.
+                  </p>
+                ) : null}
               </label>
               <div className={adminFieldClass}>
                 Categoría
@@ -613,6 +702,13 @@ export function ProductoEditorDrawer({
               <p className="text-sm text-slate-500">
                 Portada de este SKU{sku.trim() ? ` (${sku.trim()})` : ""}. La foto no se comparte con las otras variantes.
               </p>
+              {isDuplicate ? (
+                <p className="text-sm text-slate-600">
+                  {portada
+                    ? "Se conservó la URL de la imagen original. Usá Quitar si la copia tiene que quedar sin foto."
+                    : "El producto original no tiene una imagen para reutilizar."}
+                </p>
+              ) : null}
 
               <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                 {imagenLoading || uploading ? (
@@ -648,6 +744,7 @@ export function ProductoEditorDrawer({
                   <Button
                     variant="ghost"
                     onClick={() => {
+                      portadaEditadaRef.current = true;
                       setPortada("");
                       setPortadaLista(true);
                     }}
@@ -757,7 +854,7 @@ export function ProductoEditorDrawer({
               loading={saving}
               disabled={imagenLoading || uploading}
             >
-              {isCreate ? "Crear producto" : "Guardar cambios"}
+              {isDuplicate ? "Crear copia" : isCreate ? "Crear producto" : "Guardar cambios"}
             </Button>
           </div>
         </div>

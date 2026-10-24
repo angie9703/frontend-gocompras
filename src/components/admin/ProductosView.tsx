@@ -1,6 +1,7 @@
 "use client";
 
-import { Boxes, ImageOff, MoreVertical, Package, PackagePlus, Pencil, Star, Trash2, Upload, X } from "lucide-react";
+import { Boxes, Copy, ImageOff, MoreVertical, Package, PackagePlus, Pencil, Star, Trash2, Upload, X } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertDialog } from "@/components/admin/AlertDialog";
 import { CargaMasivaView } from "@/components/admin/CargaMasivaView";
@@ -155,6 +156,12 @@ function pageNumbers(current: number, total: number): number[] {
 }
 
 export function ProductosView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const duplicateFrom = searchParams.get("duplicateFrom");
+  const duplicateSku = searchParams.get("duplicateSku");
+  const duplicateTokenRef = useRef<string | null>(null);
+  const duplicateGenerationRef = useRef(0);
   const cargaTitleId = useId();
   const stockTitleId = useId();
   const [query, setQuery] = useState("");
@@ -172,6 +179,7 @@ export function ProductosView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<"crear" | "editar" | "duplicar">("crear");
   const [editing, setEditing] = useState<Producto | null>(null);
   const [editingSku, setEditingSku] = useState<string | null>(null);
   const [cargaOpen, setCargaOpen] = useState(false);
@@ -428,23 +436,91 @@ export function ProductosView() {
     }
   };
 
+  const limpiarQueryDuplicado = () => {
+    if (!searchParams.get("duplicateFrom") && !searchParams.get("duplicateSku")) return;
+    duplicateTokenRef.current = null;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("duplicateFrom");
+    params.delete("duplicateSku");
+    const qs = params.toString();
+    router.replace(qs ? `/admin/productos?${qs}` : "/admin/productos", { scroll: false });
+  };
+
+  const cerrarEditor = () => {
+    duplicateGenerationRef.current += 1;
+    setEditorOpen(false);
+    setEditingSku(null);
+    setEditorMode("crear");
+    limpiarQueryDuplicado();
+  };
+
   const openCreate = () => {
+    duplicateGenerationRef.current += 1;
+    limpiarQueryDuplicado();
     setEditing(null);
     setEditingSku(null);
+    setEditorMode("crear");
     setEditorOpen(true);
   };
 
   const openEdit = async (fila: InventarioFila) => {
+    duplicateGenerationRef.current += 1;
     setError(null);
     try {
       const response = await getProductoById(fila.productoId);
+      limpiarQueryDuplicado();
       setEditing(response.data);
       setEditingSku(fila.sku);
+      setEditorMode("editar");
       setEditorOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo abrir el producto.");
     }
   };
+
+  const solicitarDuplicado = (fila: InventarioFila) => {
+    const params = new URLSearchParams();
+    params.set("duplicateFrom", String(fila.productoId));
+    const sku = fila.sku.trim();
+    if (sku) params.set("duplicateSku", sku);
+    router.push(`/admin/productos/nuevo?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    if (!duplicateFrom) return;
+    const productoId = Number(duplicateFrom);
+    if (!Number.isInteger(productoId) || productoId <= 0) {
+      setError("No se pudo duplicar el producto.");
+      return;
+    }
+    const token = `${productoId}:${duplicateSku ?? ""}`;
+    if (duplicateTokenRef.current === token) return;
+    duplicateTokenRef.current = token;
+
+    const generation = duplicateGenerationRef.current;
+    let cancelled = false;
+    let finished = false;
+    setError(null);
+    void getProductoById(productoId)
+      .then((response) => {
+        if (cancelled || duplicateGenerationRef.current !== generation) return;
+        finished = true;
+        setEditing(response.data);
+        setEditingSku(duplicateSku);
+        setEditorMode("duplicar");
+        setEditorOpen(true);
+      })
+      .catch((err: unknown) => {
+        if (cancelled || duplicateGenerationRef.current !== generation) return;
+        duplicateTokenRef.current = null;
+        setError(err instanceof Error ? err.message : "No se pudo duplicar el producto.");
+      });
+
+    return () => {
+      cancelled = true;
+      if (!finished) duplicateTokenRef.current = null;
+    };
+  }, [duplicateFrom, duplicateSku]);
 
   useEffect(() => {
     if (!toast) return;
@@ -916,6 +992,10 @@ export function ProductosView() {
                             <Pencil className="size-3.5" aria-hidden />
                             Editar producto
                           </AdminDropdownItem>
+                          <AdminDropdownItem onClick={() => solicitarDuplicado(fila)}>
+                            <Copy className="size-3.5" aria-hidden />
+                            Publicar producto similar
+                          </AdminDropdownItem>
                           <AdminDropdownItem
                             onClick={() => {
                               setStockTarget(fila);
@@ -987,15 +1067,13 @@ export function ProductosView() {
 
       {editorOpen ? (
         <ProductoEditorDrawer
-          key={`${editing?.id ?? "nuevo"}-${editingSku ?? ""}`}
+          key={`${editorMode}-${editing?.id ?? "nuevo"}-${editingSku ?? ""}`}
           producto={editing}
           sku={editingSku}
+          duplicando={editorMode === "duplicar"}
           categorias={categorias}
           marcas={marcas}
-          onClose={() => {
-            setEditorOpen(false);
-            setEditingSku(null);
-          }}
+          onClose={cerrarEditor}
           onSubcategoriasSync={(id, nombres, change) => {
             setCategorias((current) =>
               current.map((item) => (item.id === id ? { ...item, subcategorias: nombres } : item)),
@@ -1007,13 +1085,37 @@ export function ProductosView() {
               setSelectedSubcategoria((current) => (current === change.nombre ? "" : current));
             }
           }}
-          onSaved={async () => {
+          onSaved={async (guardado) => {
+            if (guardado) {
+              const skuAnterior = editingSku;
+              setItems((current) =>
+                current.map((fila) =>
+                  fila.productoId === guardado.productoId &&
+                  (fila.sku === guardado.sku || fila.sku === skuAnterior)
+                    ? {
+                        ...fila,
+                        sku: guardado.sku,
+                        nombre: guardado.nombre,
+                        nombreCompleto: guardado.nombre,
+                        precio: guardado.precio,
+                        precioOferta: guardado.precioOferta,
+                        stock: guardado.stock,
+                      }
+                    : fila,
+                ),
+              );
+            }
             await reload();
+            router.refresh();
             void getAdminCategorias().then(setCategorias);
-            setEditorOpen(false);
+            cerrarEditor();
           }}
           confirmingDelete={deleteTarget != null}
-          onRequestDelete={editing ? () => requestDelete(editing.id, editing.nombre) : undefined}
+          onRequestDelete={
+            editorMode === "editar" && editing
+              ? () => requestDelete(editing.id, editing.nombre)
+              : undefined
+          }
         />
       ) : null}
 
